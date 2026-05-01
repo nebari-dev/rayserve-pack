@@ -46,8 +46,18 @@ kuberay-operator:
   enabled: true
 
 # =============================================================================
-# Ray Serve Applications
+# Ray Serve
 # =============================================================================
+serve:
+  # proxy_location for Ray Serve (https://docs.ray.io/en/latest/serve/architecture.html#http-proxies).
+  # EveryNode places an HTTP proxy on every Ray pod, which is typically what
+  # you want with KubeRay (each pod is its own scheduling unit, can ingress
+  # traffic, and pod-local probes can hit localhost:8000). HeadOnly runs a
+  # single proxy on the head pod — saves resources at the cost of a single
+  # ingress point, useful for very large clusters. Disabled turns HTTP off
+  # entirely (programmatic Serve handles only).
+  proxyLocation: EveryNode
+
 # Declarative Serve applications deployed via RayService serveConfigV2.
 # Each application must specify an import_path to a module:app baked into
 # the Ray image. For production, build a custom image with your model code.
@@ -85,6 +95,13 @@ head:
       cpu: "1"
       memory: "2Gi"
 
+  # Head pod readiness/liveness probes. Defaults to {} which lets KubeRay
+  # apply its built-in probes. Override here to set explicit probes; see
+  # the worker.readinessProbe / worker.livenessProbe block below for the
+  # rationale and a concrete example.
+  readinessProbe: {}
+  livenessProbe: {}
+
 # =============================================================================
 # Ray Workers
 # =============================================================================
@@ -101,6 +118,47 @@ worker:
     requests:
       cpu: "1"
       memory: "2Gi"
+
+  # Worker pod readiness/liveness probes.
+  #
+  # KubeRay's default worker probes chain a raylet healthz check with
+  # `wget http://localhost:8000/-/healthz | grep success`. The Serve check
+  # requires both a deployed Serve application and a local Serve HTTP proxy,
+  # neither of which holds on a fresh cluster (default serveApplications is
+  # empty, default Ray Serve proxy_location varies by Ray version). When the
+  # Serve check fails the worker pod stays 0/1 Ready forever.
+  #
+  # The defaults below check raylet healthz alone — the Ray node is Ready
+  # when its raylet is healthy. Serve application health is tracked by the
+  # Serve controller and need not gate K8s pod readiness; the chart's
+  # serve-svc Service targets only the head pod, so worker readiness has no
+  # effect on user-visible HTTP routing.
+  #
+  # Set either probe to null (~ in YAML) to suppress it and let KubeRay's
+  # default apply. Setting to {} won't suppress — Helm's deep merge keeps
+  # existing keys when overlaying with an empty map.
+  # See https://github.com/nebari-dev/nebari-rayserve-pack/issues/7 for the
+  # full diagnosis.
+  readinessProbe:
+    exec:
+      command:
+        - bash
+        - -c
+        - "wget -T 2 -q -O- http://localhost:52365/api/local_raylet_healthz | grep success"
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 1
+  livenessProbe:
+    exec:
+      command:
+        - bash
+        - -c
+        - "wget -T 2 -q -O- http://localhost:52365/api/local_raylet_healthz | grep success"
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 120
 
 # =============================================================================
 # Overrides

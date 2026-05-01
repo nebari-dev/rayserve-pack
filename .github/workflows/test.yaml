@@ -38,7 +38,11 @@ jobs:
             --set head.resources.requests.memory=512Mi \
             --set head.resources.limits.cpu=1 \
             --set head.resources.limits.memory=1Gi \
-            --set worker.replicas=0 \
+            --set worker.replicas=1 \
+            --set worker.resources.requests.cpu=250m \
+            --set worker.resources.requests.memory=512Mi \
+            --set worker.resources.limits.cpu=500m \
+            --set worker.resources.limits.memory=1Gi \
             --timeout 5m
 
       - name: Wait for Ray head pod
@@ -53,6 +57,24 @@ jobs:
             sleep 5
           done
           kubectl wait --for=condition=ready pod -l ray.io/node-type=head --timeout=180s
+
+      # Exercises the fix from #7: with default values (no Serve apps deployed),
+      # the worker pod must reach Ready solely on raylet healthz. Before this
+      # chart override, KubeRay's default probe also required a Serve healthz
+      # response on localhost:8000, which never became available without an
+      # explicitly deployed Serve application.
+      - name: Wait for Ray worker pod
+        run: |
+          echo "Waiting for worker pod..."
+          for i in $(seq 1 60); do
+            if kubectl get pod -l ray.io/node-type=worker -o name 2>/dev/null | grep -q pod; then
+              echo "Worker pod found"
+              break
+            fi
+            echo "  attempt $i/60..."
+            sleep 5
+          done
+          kubectl wait --for=condition=ready pod -l ray.io/node-type=worker --timeout=240s
 
       - name: Health check Ray Dashboard
         run: |

@@ -11,6 +11,7 @@ spec:
   # Empty by default; users add applications via values or deploy at runtime
   # via the Ray Dashboard REST API.
   serveConfigV2: |
+    proxy_location: {{ .Values.serve.proxyLocation }}
     http_options:
       host: "0.0.0.0"
       port: 8000
@@ -44,6 +45,14 @@ spec:
                   name: client
                 - containerPort: 8000
                   name: serve
+              {{- with .Values.head.readinessProbe }}
+              readinessProbe:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with .Values.head.livenessProbe }}
+              livenessProbe:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
     workerGroupSpecs:
       - replicas: {{ .Values.worker.replicas }}
         minReplicas: {{ .Values.worker.minReplicas | default .Values.worker.replicas }}
@@ -64,3 +73,11 @@ spec:
                 {{- end }}
                 resources:
                   {{- toYaml .Values.worker.resources | nindent 18 }}
+                {{- with .Values.worker.readinessProbe }}
+                readinessProbe:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
+                {{- with .Values.worker.livenessProbe }}
+                livenessProbe:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
