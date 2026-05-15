@@ -1,6 +1,6 @@
 ---
 title: Nebari Ray Serve Pack
-description: End-user documentation for the Nebari Ray Serve software pack.
+description: Documentation for the Nebari Ray Serve software pack — deploy on Kubernetes and serve Python models behind an HTTP endpoint.
 sidebar_position: 1
 ---
 
@@ -11,10 +11,15 @@ on Kubernetes via the [RayService CRD](https://docs.ray.io/en/latest/serve/produ
 with optional routing, TLS, and OIDC authentication via the
 [nebari-operator](https://github.com/nebari-dev/nebari-operator).
 
-## Documentation
+## Which guide do you need?
 
-- **[Using Ray Serve](./using-ray-serve)** — end-user guide: connect from a notebook, deploy a model, troubleshoot.
-- **[README](https://github.com/nebari-dev/nebari-rayserve-pack/blob/main/README.md)** — install, chart configuration, and ArgoCD example for operators.
+- **[Deploying Ray Serve](./deploying-ray-serve)** — installing the pack on a
+  cluster (standalone or via ArgoCD on Nebari), configuring routing/TLS/auth,
+  sizing the Ray cluster, and verifying the deployment. Aimed at **operators**.
+- **[Using Ray Serve](./using-ray-serve)** — connecting from a Jupyter notebook,
+  deploying a model with `serve.run(...)`, reading the dashboard, and
+  troubleshooting common failures. Aimed at **end users** on a cluster that
+  already has the pack installed.
 
 ## At a glance
 
@@ -22,6 +27,14 @@ with optional routing, TLS, and OIDC authentication via the
 |---|---|
 | Default Ray version | 2.43.0 |
 | Default Python version | 3.9 |
-| Default access | in-cluster only (recommended) |
+| Default access pattern | in-cluster only (recommended) |
 | Optional external access | Envoy Gateway + Keycloak OIDC via NebariApp |
+| Maturity | experimental |
 | Source | [github.com/nebari-dev/nebari-rayserve-pack](https://github.com/nebari-dev/nebari-rayserve-pack) |
+
+## What this pack is not
+
+Ray Serve is a **model-serving** framework. This pack is tuned for serving
+HTTP endpoints, not for general Ray Data, Ray Tune, or Ray Train workloads.
+For interactive parallel compute on Nebari, use the Dask gateway from the
+data-science pack instead.

@@ -1,7 +1,7 @@
 ---
 title: Using Ray Serve
 description: Connect to the cluster from a Jupyter notebook, deploy a Serve application, and troubleshoot the common failure modes.
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # Using Ray Serve
