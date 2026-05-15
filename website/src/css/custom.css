@@ -1,0 +1,53 @@
+/**
+ * Required by the Docusaurus classic preset. Any CSS in this file will be
+ * loaded globally. Variables follow Infima (https://infima.dev).
+ *
+ * Color palette pulled from nebari.dev:
+ *   - magenta  #c840e9  primary CTA / links
+ *   - teal     #20aaa1  secondary accent / decorative
+ *   - dark bg  #1a1625  deep purple-black for dark mode
+ *   - navbar   #15111e  one shade darker than page bg
+ */
+
+:root {
+  --ifm-color-primary: #c840e9;
+  --ifm-color-primary-dark: #be29e0;
+  --ifm-color-primary-darker: #b51bd9;
+  --ifm-color-primary-darkest: #9417b4;
+  --ifm-color-primary-light: #d258ed;
+  --ifm-color-primary-lighter: #d765ef;
+  --ifm-color-primary-lightest: #e289f3;
+
+  /* Teal as a secondary brand accent — used on admonition borders, etc. */
+  --nebari-teal: #20aaa1;
+  --nebari-teal-light: #25c2b8;
+
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #d257ec;
+  --ifm-color-primary-dark: #c83fe9;
+  --ifm-color-primary-darker: #c331e7;
+  --ifm-color-primary-darkest: #a519c5;
+  --ifm-color-primary-light: #dc6fef;
+  --ifm-color-primary-lighter: #e07df1;
+  --ifm-color-primary-lightest: #ea9ef5;
+
+  /* Nebari's deep purple-black page background and one-shade-darker navbar. */
+  --ifm-background-color: #1a1625;
+  --ifm-background-surface-color: #221b30;
+  --ifm-navbar-background-color: #15111e;
+  --ifm-footer-background-color: #15111e;
+
+  /* Slightly more contrast on inline code blocks against the dark bg. */
+  --ifm-code-background: #2a2238;
+
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* Reinforce the teal accent on admonition titles, in both themes. */
+.theme-admonition-note {
+  border-left-color: var(--nebari-teal);
+}
