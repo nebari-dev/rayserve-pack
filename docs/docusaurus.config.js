@@ -36,6 +36,19 @@ const config = {
   },
   themes: ['@docusaurus/theme-mermaid'],
 
+  // Client-side search index, no Algolia account required. Matches the
+  // search backend used by nebari-dev/nebari-docs. The index is only
+  // generated during `npm run build`; in dev mode the search box renders
+  // but returns no results until you run the build.
+  plugins: [
+    [
+      require.resolve('docusaurus-lunr-search'),
+      {
+        languages: ['en'],
+      },
+    ],
+  ],
+
   presets: [
     [
       'classic',
@@ -63,6 +76,13 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      // Show the navbar light/dark toggle and respect the visitor's OS
+      // preference on first load.
+      colorMode: {
+        defaultMode: 'light',
+        disableSwitch: false,
+        respectPrefersColorScheme: true,
+      },
       docs: {
         sidebar: {
           hideable: true,
