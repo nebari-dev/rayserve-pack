@@ -64,7 +64,7 @@ const config = {
       navbar: {
         title: 'Nebari Ray Serve Pack',
         logo: {
-          alt: 'Nebari Ray Serve Pack',
+          alt: 'Nebari logo',
           src: 'img/logo.svg',
         },
         items: [

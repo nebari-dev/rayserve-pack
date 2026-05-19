@@ -33,10 +33,13 @@ from the data-science pack instead.
 
 :::
 
-The deployment is backed by the **RayService CRD** managed by KubeRay — you
-do not start or stop the Ray cluster from your notebook. It exists as a
-long-lived resource in Kubernetes. You connect to it, deploy applications,
-and disconnect; the cluster keeps running.
+The deployment is backed by the **RayService CRD** (a Kubernetes custom
+resource that manages the Ray cluster's lifecycle) operated by KubeRay. You
+do not start or stop the cluster from your notebook — it exists as a
+long-lived resource in Kubernetes. You connect, deploy applications, and
+disconnect; the cluster keeps running, and any applications you registered
+with `serve.run(...)` keep serving until you call `serve.delete(...)` or the
+cluster is restarted by an operator.
 
 ## How the pack is deployed
 
@@ -185,22 +188,24 @@ print(resp.text)
 ```
 
 The application is now live. Other notebooks (and other in-cluster services)
-can hit the same URL. To remove it:
+can hit the same URL. To remove the application (and all of its deployments):
 
 ```python
 serve.delete("hello")
 ```
 
-### A more realistic example
+`serve.delete(name)` removes the application registered under `name` — not a
+single `@serve.deployment` inside it. The Ray cluster itself keeps running.
 
-_TBD — a worked example with a real model (e.g. a HuggingFace transformer
-or a scikit-learn classifier) that takes a JSON request body and returns a
-prediction. Should illustrate `num_replicas`, `ray_actor_options` for GPU
-deployments, and request batching. Pick whatever model best matches the
-audience for the deployment._
+### Real models
 
-For now, see the upstream [Ray Serve quickstart](https://docs.ray.io/en/latest/serve/getting_started.html)
-and [model composition guide](https://docs.ray.io/en/latest/serve/model_composition.html).
+For real-world patterns — JSON request bodies, `num_replicas`, GPU-aware
+`ray_actor_options`, request batching, and chained models — the upstream
+[Ray Serve quickstart](https://docs.ray.io/en/latest/serve/getting_started.html)
+and [model composition guide](https://docs.ray.io/en/latest/serve/model_composition.html)
+apply unchanged on this pack. The only constraint is that your model's
+dependencies must be installed in the Ray image (operator concern — see
+[Step 5](#step-5--handing-off-to-production) below).
 
 ## Step 4 — The Ray Dashboard
 
@@ -224,43 +229,42 @@ your operator for the URL.
 recent request volume. This is the fastest way to confirm a `serve.run(...)`
 call took effect.
 
-_TBD — screenshot of the Serve tab showing a healthy `hello` application,
-captured against an actual deployment._
+After running the Hello world example above, the Serve tab shows:
+
+- Application `hello` with status `RUNNING` (green).
+- One deployment `Hello` with status `HEALTHY` and one active replica.
+- Recent request rate and latency, refreshed every few seconds.
+
+If a deployment stays in `DEPLOYING` for more than a minute, the pod is
+likely stuck pulling the image or waiting for resources — check
+`kubectl get pods -n rayserve` and `kubectl describe pod ...` for the
+underlying error.
 
 The dashboard also exposes a REST API at `/api/serve/applications/` — useful
 for deploying applications declaratively from a CI pipeline, see the
 [Ray Serve REST API docs](https://docs.ray.io/en/latest/serve/api/index.html#serve-rest-api).
 
-## Step 5 — Going to production
+## Step 5 — Handing off to production
 
-For real workloads, declarative deployments via the chart's
-`serveApplications` value are preferred over interactive `serve.run(...)`
-calls. They survive cluster restarts, version with your GitOps repo, and
-get the RayService controller's zero-downtime upgrade behaviour.
+`serve.run(...)` in a notebook is fine for development, but production
+workloads should be declared in the chart's `serveApplications` value
+instead. Declarative apps survive cluster restarts, version with your
+GitOps repo, and get the RayService controller's zero-downtime upgrade
+behaviour. Interactive `serve.run` apps do not — they disappear if the
+head pod restarts.
 
-Operators bake the model code into a custom Ray image and declare
-applications like this in `values.yaml`:
+This is operator territory. Your job as an end user:
 
-```yaml
-image:
-  repository: your-registry/your-ray-image
-  tag: "2.43.0-custom"
+1. Iterate against a development cluster using `serve.run(...)` until the
+   model works.
+2. Pin the exact package versions your code needs.
+3. Hand the working `import_path` and dependency list off to your operator,
+   who bakes them into the Ray image and adds an entry to `serveApplications`.
 
-serveApplications:
-  - name: my-model
-    route_prefix: /predict
-    import_path: myapp.model:app
-    deployments:
-      - name: MyModel
-        num_replicas: 2
-```
-
-See the pack [README](https://github.com/nebari-dev/nebari-rayserve-pack/blob/main/README.md#deploying-models-production) and the
+See [Deploying Ray Serve → Production](./deploying-ray-serve#production-custom-image-with-model-code-baked-in)
+for the operator-side detail and the
 upstream [Ray Serve production guide](https://docs.ray.io/en/latest/serve/production-guide/index.html)
-for full deployment, image-build, and rollout details. This is operator
-territory — as an end user, you typically iterate against a development
-deployment using `serve.run(...)` and hand the working application off to
-your operator to bake into the next image.
+for image-build recipes and rollout policies.
 
 ## Accessing your model from outside the cluster
 
@@ -300,8 +304,8 @@ the gateway entirely and need no auth.
 
 :::
 
-_TBD — the actual external hostname for this specific deployment, once
-configured by the operator._
+Ask your operator for the value they set in `nebariapp.hostname` — that's
+the URL external clients should hit.
 
 ## Troubleshooting
 
@@ -374,6 +378,32 @@ If missing, add it (operators usually do this via the ArgoCD
 ```bash
 kubectl label namespace rayserve nebari.dev/managed=true
 ```
+
+### My model is crashlooping or returning errors
+
+If `serve.run(...)` returns successfully but requests fail or hang, the
+Serve replica itself is failing. Check the worker pod directly:
+
+```bash
+kubectl get pods -n rayserve
+kubectl logs -n rayserve <worker-pod>
+kubectl logs -n rayserve <worker-pod> --previous   # last crash
+```
+
+Common causes:
+
+- **`ImportError` on `serve.run`** — your code requires a package that is
+  not installed in the Ray image. Pin the same version in your notebook
+  environment first to confirm it imports there, then hand it to your
+  operator to add to the Ray image (see [Step 5](#step-5--handing-off-to-production)).
+- **OOMKilled** — the model exceeded the worker's memory limit. Ask your
+  operator to raise `worker.resources.limits.memory`, or reduce batch
+  size / model precision.
+- **CUDA out of memory** — same as OOM but on the GPU. Reduce batch size
+  or request a larger GPU pool.
+
+The dashboard's Serve tab is faster than `kubectl logs` for spotting
+which replica is unhealthy; jump there first if it's reachable.
 
 ## Reference
 

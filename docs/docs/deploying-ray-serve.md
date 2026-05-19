@@ -140,10 +140,11 @@ will show no progress on conditions.
 
 :::
 
-:::warning[`redirectURI` must not be `/`]
+:::warning[`redirectURI` must be a real callback path]
 
-Envoy Gateway rejects `/` as an OIDC `redirectURI`. Always use
-`/oauth2/callback` (the default in the example above).
+A bare `/` does not function as the OIDC callback — Envoy Gateway needs a
+distinct path it can route to the OAuth handler. Always use a real path
+like `/oauth2/callback` (the default in the example above).
 
 :::
 
