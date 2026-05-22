@@ -51,7 +51,7 @@ Symptom: `ray.init(...)` hangs indefinitely, or returns an opaque
 "connection error" or "version mismatch" exception.
 
 → Full recovery steps:
-[Use Ray Serve → `ray.init` hangs or fails with a version error](./use#rayinit-hangs-or-fails-with-a-version-error).
+[Use Ray Serve → `ray.init` hangs or fails with a version error](./use_ray_from_notebook#rayinit-hangs-or-fails-with-a-version-error).
 
 ### Notebook can't reach the Ray service
 
@@ -60,7 +60,7 @@ cluster IPs. `ray.init` hangs indefinitely; `curl` from a notebook
 terminal to the head service times out.
 
 → Full recovery steps:
-[Use Ray Serve → Notebook can't reach the Ray service](./use#notebook-cant-reach-the-ray-service-network-policy-blocks-egress).
+[Use Ray Serve → Notebook can't reach the Ray service](./use_ray_from_notebook#notebook-cant-reach-the-ray-service).
 
 ### Crashlooping replicas
 
@@ -77,7 +77,7 @@ different fixes:
   500. Cause is an exception in `__call__` itself, not at startup.
 
 → Full recovery steps:
-[Use Ray Serve → My model is crashlooping or returning errors](./use#my-model-is-crashlooping-or-returning-errors).
+[Use Ray Serve → My model is crashlooping or returning errors](./use_ray_from_notebook#my-model-is-crashlooping-or-returning-errors).
 
 A failing replica usually shows up in the Ray Dashboard's Serve tab as
 `DEPLOY_FAILED` once Serve has given up restarting it (typically "failed

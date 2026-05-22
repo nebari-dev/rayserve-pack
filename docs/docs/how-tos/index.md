@@ -17,12 +17,12 @@ The how-tos assume:
 - Your operator has confirmed the Ray cluster is `Running` and given you
   the namespace name (typically `rayserve`).
 - Your notebook environment has matching Ray and Python versions
-  (see [Step 1](./use#step-1--prepare-your-notebook-environment) of the
+  (see [Step 1](./use_ray_from_notebook#step-1--prepare-your-notebook-environment) of the
   Use guide).
 
 ## What's in this section
 
-- **[Use Ray Serve from a notebook](./use)** — the main end-user
+- **[Use Ray Serve from a notebook](./use_ray_from_notebook)** — the main end-user
   walkthrough: prepare the notebook environment, connect via the
   in-cluster `ray://` URL, deploy a model with `serve.run(...)`, read the
   dashboard, and (optionally) expose the model externally.

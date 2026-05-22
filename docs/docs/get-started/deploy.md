@@ -8,7 +8,7 @@ sidebar_position: 2
 
 This guide is for **operators** installing the pack on a Kubernetes cluster.
 End users connecting to an already-deployed cluster should read
-[Use Ray Serve](../how-tos/use) instead.
+[Use Ray Serve](../how-tos/use_ray_from_notebook) instead.
 
 The pack deploys:
 
@@ -363,7 +363,7 @@ chart's defaults in place. See the comments in `values.yaml`.
 
 ## Next steps
 
-- **End users** → [Use Ray Serve](../how-tos/use) — how to connect a
+- **End users** → [Use Ray Serve](../how-tos/use_ray_from_notebook) — how to connect a
   notebook, deploy a model, and read the dashboard.
 - **Full chart reference** → [`values.yaml` reference](../references/values) —
   every option with type, default, and description, sourced from

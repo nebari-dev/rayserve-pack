@@ -15,7 +15,7 @@ const sidebars = {
       label: 'How-to guides',
       link: { type: 'doc', id: 'how-tos/index' },
       items: [
-        'how-tos/use',
+        'how-tos/use_ray_from_notebook',
         'how-tos/troubleshoot',
       ],
     },

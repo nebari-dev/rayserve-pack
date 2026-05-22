@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: An overview of the Nebari Ray Serve pack — deploy Ray Serve on Kubernetes and serve Python models behind an HTTP endpoint.
+description: An overview of the Nebari Ray Serve pack — deploy Ray Serve on Nebari and serve Python models behind an HTTP endpoint.
 slug: /
 sidebar_position: 1
 ---
@@ -12,25 +12,25 @@ import DocCardList from '@theme/DocCardList';
 ## What is the Nebari Ray Serve pack?
 
 **The Nebari Ray Serve pack is a Nebari Software Pack that deploys
-[Ray Serve](https://docs.ray.io/en/latest/serve/index.html) on Kubernetes.**
+[Ray Serve](https://docs.ray.io/en/latest/serve/index.html) on the Nebari kubernetes cluster.**
 It packages the [KubeRay operator](https://github.com/ray-project/kuberay),
 a [RayService](https://docs.ray.io/en/latest/serve/production-guide/kubernetes.html)
 custom resource, and the optional routing/TLS/OIDC layer provided by
 [nebari-operator](https://github.com/nebari-dev/nebari-operator) into one Helm chart.
 
-Once installed, teams on the cluster can deploy Python models behind an HTTP
-endpoint without touching the underlying Kubernetes plumbing.
+Once installed, Nebari users can deploy Python models behind an HTTP
+endpoint without requiring access to the underlying kubernetes cluster.
 
 ## Why use this pack?
 
 Building a production Ray Serve deployment on Kubernetes typically involves:
 
 - Installing and operating the KubeRay operator.
-- Authoring a RayService spec with the right probe behaviour for the
+- Authoring a RayService spec with the right probe behavior for the
   development phase (no apps deployed yet) and the production phase (apps
   serving traffic).
 - Wiring the dashboard and serve endpoint through an ingress with TLS.
-- Bolting on OIDC auth for the dashboard if you want users to log in.
+- Bolting on OIDC auth for the dashboard allowing users to log in.
 
 The pack does all of this for you, with sensible defaults aimed at notebook
 users on a Nebari cluster. You install one chart and your data scientists
@@ -39,7 +39,7 @@ get a working `ray://` endpoint and dashboard the same day.
 ## Key features
 
 - **One-chart install** — KubeRay operator, RayService, and stable Kubernetes
-  Services come up together from a single Helm release.
+  Services come up together from a single Helm chart.
 - **Notebook-first defaults** — the serve endpoint is internal-only by
   default, so notebooks on the cluster reach it via service DNS without
   going through auth.
@@ -69,19 +69,6 @@ get a working `ray://` endpoint and dashboard the same day.
 
 Ray Serve is a **model-serving** framework. This pack is tuned for serving
 HTTP endpoints, not for general Ray Data, Ray Tune, or Ray Train workloads.
-For interactive parallel compute on Nebari, use the Dask gateway from the
-data-science pack instead.
-
-## At a glance
-
-| | |
-|---|---|
-| Default Ray version | 2.43.0 |
-| Default Python version | 3.9 |
-| Default access pattern | in-cluster only (recommended) |
-| Optional external access | Envoy Gateway + Keycloak OIDC via NebariApp |
-| Maturity | experimental |
-| Source | [github.com/nebari-dev/nebari-rayserve-pack](https://github.com/nebari-dev/nebari-rayserve-pack) |
 
 ## Next steps
 
