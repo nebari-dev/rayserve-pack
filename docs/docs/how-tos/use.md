@@ -94,9 +94,11 @@ they do **not** wait for a Serve application to be deployed.
 :::warning[Version match required]
 
 The Ray client uses a binary protocol that is sensitive to version skew.
-Your notebook's Ray version **and** Python minor version must match the
-cluster, or `ray.init(...)` will fail with an opaque error or hang. This
-is the most common end-user failure mode.
+Your notebook's Ray version **and** Python *minor* version must match the
+cluster (e.g. 3.9 ≠ 3.10), or `ray.init(...)` will fail with an opaque
+error or hang. Patch-level differences (3.9.21 vs 3.9.23) typically only
+log a warning and still connect. This is the most common end-user failure
+mode.
 
 :::
 
@@ -108,8 +110,16 @@ kubectl exec -n rayserve $(kubectl get pod -n rayserve -l ray.io/node-type=head 
 kubectl exec -n rayserve $(kubectl get pod -n rayserve -l ray.io/node-type=head -o name) -- python --version
 ```
 
-If your Nebari deployment uses the [Nebi pack](https://github.com/nebari-dev/nebari-nebi-pack)
-for workspace management, declare a workspace pinned to the cluster's versions:
+### Recommended: use Nebi to create a workspace
+
+On a Nebari cluster the default JupyterLab kernel runs inside a
+pixi-managed, **read-only** environment — `pip install` fails with
+`No module named pip`. The right path is the
+[Nebi pack](https://github.com/nebari-dev/nebari-nebi-pack), which
+provisions an isolated workspace at the versions you declare.
+
+From the JupyterLab Launcher, click the **Nebi** tile and create a
+workspace with this spec:
 
 ```toml
 [workspace]
@@ -121,9 +131,37 @@ platforms = ["linux-64"]
 python = "3.9.*"
 ray-serve = "2.43.*"
 ipykernel = ">=6.0"
+requests = "*"
 ```
 
-Without Nebi, install the same versions into your kernel directly:
+Wait for Nebi to mark the workspace `Ready` (usually 1–3 minutes).
+
+:::warning[Nebi workspaces don't always register a Jupyter kernel automatically]
+
+If after a hard refresh (`Ctrl+Shift+R`) the new kernel doesn't appear
+in the Launcher, the workspace built but the ipykernel registration
+step was skipped. Open a terminal in JupyterLab, find the env path,
+and register it manually:
+
+```bash
+# 1. find your workspace path (Nebi stores them under ~/.local/share/nebi/workspaces/)
+ls ~/.local/share/nebi/workspaces/
+
+# 2. cd into the env so the rest fits on one line
+cd ~/.local/share/nebi/workspaces/<your-workspace-dir>/.pixi/envs/default
+
+# 3. register the kernel
+./bin/python -m ipykernel install --user --name ray-serve --display-name "Python (ray-serve)"
+```
+
+Hard-refresh JupyterLab and the kernel will appear in the Launcher.
+
+:::
+
+### Fallback: install directly into a writable kernel
+
+If you're not on Nebari (or your kernel is writable and you don't want
+to use Nebi), install the matching versions directly:
 
 ```bash
 pip install "ray[serve]==2.43.*"
@@ -235,13 +273,7 @@ After running the Hello world example above, the Serve tab shows:
 - One deployment `Hello` with status `HEALTHY` and one active replica.
 - Recent request rate and latency, refreshed every few seconds.
 
-:::info[Screenshot placeholder]
-
-A screenshot of the Ray Dashboard's Serve tab showing a healthy `hello`
-application would go here. Capture after running the quickstart against
-a fresh cluster.
-
-:::
+![Ray Dashboard Serve tab with the hello application running and one healthy replica](/img/screenshots/dashboard-serve-healthy.png)
 
 If a deployment stays in `DEPLOYING` for more than a minute, the pod is
 likely stuck pulling the image or waiting for resources — check
@@ -303,14 +335,7 @@ curl https://rayserve.your-cluster.example.com/hello
 The first request returns a 302 to Keycloak; after login, a session cookie
 is set and subsequent requests pass through.
 
-:::info[Screenshot placeholder]
-
-A screenshot of the Keycloak login screen presented when first hitting the
-external Ray Serve endpoint would go here. Capture against the deployment's
-actual Keycloak realm so the branding and identity-provider list match what
-real users will see.
-
-:::
+![Keycloak login screen prompting for credentials when first hitting the external Ray Serve endpoint](/img/screenshots/keycloak-login.png)
 
 :::warning[Browser clients only]
 
@@ -399,8 +424,18 @@ kubectl label namespace rayserve nebari.dev/managed=true
 
 ### My model is crashlooping or returning errors
 
-If `serve.run(...)` returns successfully but requests fail or hang, the
-Serve replica itself is failing. Check the worker pod directly:
+A "broken" Serve deployment surfaces in two distinct ways. Knowing which
+one you have narrows the cause quickly.
+
+#### Replica fails to start — `DEPLOY_FAILED`
+
+`serve.run(...)` returns, but the Dashboard's Serve tab shows the
+deployment as `DEPLOY_FAILED` with a status message like
+`"The deployment failed to start 3 times in a row"`. The replica's
+`__init__` (or import of its module) raised, so the worker never
+became ready to handle requests.
+
+Check the worker pod directly:
 
 ```bash
 kubectl get pods -n rayserve
@@ -414,11 +449,32 @@ Common causes:
   not installed in the Ray image. Pin the same version in your notebook
   environment first to confirm it imports there, then hand it to your
   operator to add to the Ray image (see [Step 5](#step-5--handing-off-to-production)).
-- **OOMKilled** — the model exceeded the worker's memory limit. Ask your
-  operator to raise `worker.resources.limits.memory`, or reduce batch
-  size / model precision.
-- **CUDA out of memory** — same as OOM but on the GPU. Reduce batch size
-  or request a larger GPU pool.
+- **OOMKilled during `__init__`** — model load exceeded the worker's
+  memory limit. Ask your operator to raise `worker.resources.limits.memory`,
+  or reduce model precision / weights footprint.
+- **CUDA out of memory during `__init__`** — same as OOM but on the
+  GPU. Reduce batch size or request a larger GPU pool.
+
+#### Replica started, but requests return 500s — deployment stays `HEALTHY`
+
+A more subtle failure mode: `serve.run(...)` succeeds, the Dashboard
+shows the deployment as `HEALTHY`, but every request returns a 500.
+That happens when `__call__` raises on each request — the replica
+itself is fine (it's running, it's responding), only the per-request
+code path is broken. Serve doesn't flip health status based on
+response codes, so the dashboard won't help here.
+
+Diagnose from the request side:
+
+```python
+resp = requests.get("http://.../my-route")
+print(resp.status_code, resp.text)   # the traceback is in resp.text
+```
+
+The Ray dashboard's **Logs** tab (or `kubectl logs` on the worker pod)
+will show the actual exception. Common causes are missing input
+validation, a model expecting a tensor shape it didn't get, or a
+downstream service call timing out.
 
 The dashboard's Serve tab is faster than `kubectl logs` for spotting
 which replica is unhealthy; jump there first if it's reachable.

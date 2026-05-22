@@ -64,22 +64,30 @@ terminal to the head service times out.
 
 ### Crashlooping replicas
 
-`serve.run(...)` returns successfully but requests fail, hang, or return
-500s. The Serve replica's worker pod is failing — usually an
-`ImportError` on a missing package, an OOMKilled (host or CUDA), or a
-model that raises on every request.
+`serve.run(...)` returns successfully but something is wrong downstream.
+Two distinct failure modes — they look similar at first but need
+different fixes:
+
+- **Replica fails to start** — Dashboard's Serve tab shows
+  `DEPLOY_FAILED` after ~3 retry attempts. Cause is usually an
+  `ImportError` on a missing package or an OOMKilled during
+  `__init__`.
+- **Replica started, requests return 500s** — Dashboard shows
+  `HEALTHY` (because the replica is running) but every request returns
+  500. Cause is an exception in `__call__` itself, not at startup.
 
 → Full recovery steps:
 [Use Ray Serve → My model is crashlooping or returning errors](./use#my-model-is-crashlooping-or-returning-errors).
 
-:::info[Screenshot placeholder]
+A failing replica usually shows up in the Ray Dashboard's Serve tab as
+`DEPLOY_FAILED` once Serve has given up restarting it (typically "failed
+to start 3 times in a row"), with a healthy app like the `hello` example
+running alongside for contrast:
 
-A screenshot of the Ray Dashboard's Serve tab showing a deployment in
-`UNHEALTHY` state — captured against a real failing deployment — would
-help readers recognise this state. Pair it with a `kubectl logs --previous`
-output sample.
+![Ray Dashboard Serve tab showing a broken application in DEPLOY_FAILED state next to a healthy hello application](/img/screenshots/dashboard-serve-deploy-failed.png)
 
-:::
+Pair the dashboard view with `kubectl logs --previous` on the failed
+worker pod to read the actual exception.
 
 ## Operator failures
 

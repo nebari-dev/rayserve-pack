@@ -292,12 +292,17 @@ kubectl describe nebariapp -n rayserve
 You want `RoutingReady`, `TLSReady`, and (when auth is on) `AuthReady`
 all `True`.
 
-:::info[Screenshot placeholder]
+Once everything is reconciled, the pack appears as a tile on the Nebari
+landing page (when `landingPage.enabled: true` on the nebari-operator),
+ready for end users to click through:
+
+![Nebari landing page showing the Ray service tile in the Healthy state](/img/screenshots/nebari-landing-ray-tile.png)
+
+:::info[Screenshot pending]
 
 A screenshot of `kubectl describe nebariapp` output showing all
-conditions `True` against a real deployment would help readers
-recognise the success state. Equally useful: a screenshot of the Nebari
-landing page tile for the Ray Dashboard, when `landingPage.enabled: true`.
+`Conditions` `True` against a real deployment is still to be captured —
+needs a terminal with cluster admin access.
 
 :::
 
