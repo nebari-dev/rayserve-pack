@@ -30,7 +30,7 @@ Building a production Ray Serve deployment on Kubernetes typically involves:
   development phase (no apps deployed yet) and the production phase (apps
   serving traffic).
 - Wiring the dashboard and serve endpoint through an ingress with TLS.
-- Bolting on OIDC auth for the dashboard allowing users to log in.
+- Bolting on OIDC auth so users can log in to the dashboard.
 
 The pack does all of this for you, with sensible defaults aimed at notebook
 users on a Nebari cluster. You install one chart and your data scientists
@@ -55,9 +55,9 @@ get a working `ray://` endpoint and dashboard the same day.
 
 ## Who this is for
 
-- **Operators** installing the pack on a Kubernetes or Nebari cluster
-  → [Get started](./get-started/) walks through the standalone and
-  ArgoCD install paths.
+- **Operators** installing the pack on a Kubernetes cluster (with or
+  without Nebari) → [Get started](./get-started/) walks through the
+  standalone and ArgoCD install paths.
 - **End users** with a notebook on a cluster that already has the pack
   installed → [How-to guides](./how-tos/) covers connecting from a
   notebook and deploying your first model.

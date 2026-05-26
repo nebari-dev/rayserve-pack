@@ -20,7 +20,7 @@ The pack deploys:
 
 ## Prerequisites
 
-| | |
+| Requirement | Notes |
 |---|---|
 | Kubernetes | 1.25+ (tested); [kind](https://kind.sigs.k8s.io/) works for local dev |
 | Tooling | [`kubectl`](https://kubernetes.io/docs/tasks/tools/), [Helm 3](https://helm.sh/docs/intro/install/) |
@@ -168,6 +168,16 @@ The full reference — every chart value with its type, default, and
 description — lives at [Reference → `values.yaml` reference](../references/values).
 The tables below cover the knobs you'll most often touch when installing.
 
+:::note[Defaults shown reflect chart v0.3.0]
+
+Version numbers and defaults in the tables below mirror the chart at the
+time of writing. The source of truth is
+[`chart/values.yaml`](https://github.com/nebari-dev/nebari-rayserve-pack/blob/main/chart/values.yaml)
+on `main` — check there for the currently pinned Ray image tag and
+resource defaults before relying on a specific value.
+
+:::
+
 ### NebariApp / external access
 
 | Value | Default | Description |
@@ -298,14 +308,6 @@ ready for end users to click through:
 
 ![Nebari landing page showing the Ray service tile in the Healthy state](/img/screenshots/nebari-landing-ray-tile.png)
 
-:::info[Screenshot pending]
-
-A screenshot of `kubectl describe nebariapp` output showing all
-`Conditions` `True` against a real deployment is still to be captured —
-needs a terminal with cluster admin access.
-
-:::
-
 ## Operator troubleshooting
 
 ### ArgoCD shows permanent `OutOfSync`
@@ -360,6 +362,51 @@ Serve HTTP check that fails on a cluster with no deployed applications.
 
 Set the probe to `null` (YAML `~`) to truly suppress, or leave the
 chart's defaults in place. See the comments in `values.yaml`.
+
+### JupyterHub network policy blocks notebook egress
+
+End users report that `ray.init(...)` from a notebook hangs forever, and
+a `curl` from the notebook terminal to
+`rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001`
+times out. The JupyterHub singleuser pod has no route to the Ray
+namespace.
+
+JupyterHub's default `singleuser.cmd: ...` configuration ships a
+NetworkPolicy that blocks egress to private cluster IPs except for a
+small DNS allowlist. The Ray namespace isn't in it.
+
+Allow egress from the singleuser namespace to the Ray namespace
+(adjust namespace selectors to match your install):
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-jupyter-to-rayserve
+  namespace: <jupyterhub-singleuser-namespace>
+spec:
+  podSelector:
+    matchLabels:
+      hub.jupyter.org/network-access-singleuser: "true"
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rayserve
+      ports:
+        - protocol: TCP
+          port: 10001     # Ray client
+        - protocol: TCP
+          port: 8000      # Serve HTTP
+        - protocol: TCP
+          port: 8265      # Dashboard
+```
+
+If you're running the Nebari JupyterHub chart, the same allowlist can be
+added under `jupyterhub.singleuser.networkPolicy.egress` instead of a
+free-standing NetworkPolicy.
 
 ## Next steps
 

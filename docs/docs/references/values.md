@@ -13,6 +13,15 @@ in the repo — the table below mirrors that file, grouped for readability.
 For example install invocations and the recommended `ignoreDifferences`
 block for ArgoCD, see [Get started → Deploy the pack](../get-started/deploy).
 
+:::note[Defaults reflect chart v0.3.0]
+
+The pinned image tags and resource defaults shown here mirror the chart
+at the time of writing. Always cross-check against
+[`chart/values.yaml`](https://github.com/nebari-dev/nebari-rayserve-pack/blob/main/chart/values.yaml)
+on `main` if you depend on a specific value.
+
+:::
+
 ## NebariApp integration
 
 Creates a NebariApp CRD that configures Envoy Gateway routing, TLS, and
@@ -127,29 +136,7 @@ for the full diagnosis.
 
 ## Production: custom image with model code baked in
 
-For real workloads, build a custom Ray image with model code and
-dependencies pre-installed, then declare applications via
-`serveApplications`:
-
-```yaml
-image:
-  repository: your-registry/your-ray-image
-  tag: "2.43.0-custom"
-
-serveApplications:
-  - name: my-model
-    route_prefix: /predict
-    import_path: myapp.model:app
-    deployments:
-      - name: MyModel
-        num_replicas: 2
-```
-
-The `import_path` must be importable from inside the Ray container.
-End users no longer need to call `serve.run(...)` — the RayService
-controller deploys and monitors these applications, including
-zero-downtime rolling upgrades when you change the chart values.
-
-See the upstream
-[Ray Serve production guide](https://docs.ray.io/en/latest/serve/production-guide/index.html)
-for image-build recipes, autoscaling configuration, and rollout policies.
+The recipe for building a custom Ray image and declaring applications
+via `serveApplications` (rather than calling `serve.run(...)`
+interactively) lives in the install guide:
+[Get started → Production: custom image with model code baked in](../get-started/deploy#production-custom-image-with-model-code-baked-in).

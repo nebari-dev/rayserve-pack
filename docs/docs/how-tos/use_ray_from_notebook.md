@@ -11,8 +11,8 @@ the deployed Ray cluster from a Jupyter notebook, deploying a model, watching
 it in the dashboard, and (optionally) exposing it outside the cluster.
 
 This guide assumes that the software pack has already been
-deployed and the cluster is healthy. For install and operations, see the pack
-[README](https://github.com/nebari-dev/nebari-rayserve-pack/blob/main/README.md).
+deployed and the cluster is healthy. For install and operations, see
+[Get started → Deploy the pack](../get-started/deploy).
 
 ## What this pack is for
 
@@ -50,15 +50,29 @@ mode.
 
 :::
 
-Ask your operator which Ray and Python versions the cluster is on. You can
-also discover the cluster's Ray version from any Python session that can
-already reach it:
+Ask your operator which Ray and Python versions the cluster is on — that's
+the authoritative answer and the fastest path. If you already have a
+working notebook on the cluster, you can also read the cluster's Ray
+version off a remote task (`ray.__version__` on its own reports the
+*local* client version, not the cluster's):
 
 ```python
-import ray
+import ray, sys
 ray.init("ray://rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001")
-print("Ray cluster version:", ray.__version__)
+
+@ray.remote
+def cluster_versions():
+    import ray, sys
+    return ray.__version__, sys.version_info[:2]
+
+cluster_ray, cluster_py = ray.get(cluster_versions.remote())
+print(f"Cluster: Ray {cluster_ray}, Python {cluster_py[0]}.{cluster_py[1]}")
+print(f"Client:  Ray {ray.__version__}, Python {sys.version_info[0]}.{sys.version_info[1]}")
 ```
+
+If the two lines disagree on Ray version or on the Python *minor* number,
+the client won't connect reliably — see
+[Troubleshooting](#rayinit-hangs-or-fails-with-a-version-error).
 
 ### Create a workspace with Nebi
 
@@ -249,14 +263,11 @@ import sys, ray
 print(ray.__version__, sys.version_info[:2])
 ```
 
-Compare against the cluster (ask your operator, or run from a notebook
-already connected via `ray.init`):
-
-```python
-import ray
-ray.init("ray://rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001")
-print(ray.__version__)
-```
+Compare against the cluster. Authoritative answer: ask your operator.
+Programmatic answer (once you have *some* working notebook session):
+use the `@ray.remote` snippet shown in
+[Step 1](#step-1--prepare-your-notebook-environment) — `ray.__version__`
+on its own reports the local client version, not the cluster's.
 
 If your local Ray or Python version doesn't match, recreate the Nebi
 workspace pinned to the cluster's versions (see
@@ -267,9 +278,13 @@ JupyterLab session is required for the new kernel to be picked up.
 
 `ray.init(...)` hangs indefinitely, and a `curl` from a notebook terminal
 to the head service times out. The most common cause is a JupyterHub
-network policy blocking egress to private cluster IPs — your operator
-needs to lift it. Flag this and link them to the
-[Troubleshoot](./troubleshoot) page.
+network policy blocking egress to private cluster IPs.
+
+This is not something you can fix from the notebook — ask your operator
+to allow egress from the JupyterHub singleuser namespace to the Ray
+service (typically `rayserve.svc.cluster.local`). The operator-side fix
+is documented at
+[Deploy → JupyterHub network policy blocks notebooks](../get-started/deploy#jupyterhub-network-policy-blocks-notebook-egress).
 
 ### My model is crashlooping or returning errors
 

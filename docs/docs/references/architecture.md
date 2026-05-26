@@ -28,7 +28,7 @@ flowchart TD
 
     subgraph RS["RayService CRD"]
         subgraph RC["RayCluster"]
-            head["Head Pod<br/>:8265 dashboard<br/>:8000 serve<br/>:10001 client"]
+            head["Head Pod<br/>:8265 dashboard<br/>:8000 serve<br/>:10001 client<br/>:6379 gcs"]
             workers["Worker Pod(s)<br/>Ray workers"]
         end
     end
@@ -38,8 +38,9 @@ flowchart TD
         servesvc["-serve-svc<br/>:8000"]
     end
 
-    subgraph NB["NebariApp (optional)"]
-        route["HTTPRoute + OIDC<br/>via Envoy Gateway"]
+    subgraph NB["NebariApps (optional)"]
+        dashroute["Dashboard NebariApp<br/>HTTPRoute + OIDC<br/>(default: on)"]
+        serveroute["Serve NebariApp<br/>HTTPRoute + OIDC<br/>(opt-in)"]
     end
 
     jupyter["Jupyter notebook<br/>(in-cluster)"]
@@ -49,11 +50,13 @@ flowchart TD
     head --- workers
     head --> headsvc
     head --> servesvc
-    servesvc --> route
+    headsvc --> dashroute
+    servesvc --> serveroute
 
     jupyter -->|"ray:// :10001"| headsvc
     jupyter -->|"HTTP :8000"| servesvc
-    browser -->|"HTTPS"| route
+    browser -->|"HTTPS dashboard"| dashroute
+    browser -->|"HTTPS serve"| serveroute
 
     style KO fill:#fef0db,stroke:#e8952c,color:#7c4a03
     style RS fill:#eeeef3,stroke:#4a4a6a,color:#1a1a2e
@@ -134,15 +137,6 @@ NebariApps in `nebari.dev/managed` namespaces and provisions:
 The nebari-operator handles the full lifecycle — when you change a
 NebariApp's hostname, the routing and TLS get rebuilt without manual
 intervention.
-
-:::info[Screenshot placeholder]
-
-A flow diagram showing the request path from an external browser through
-Envoy Gateway / TLS termination / Keycloak OIDC / HTTPRoute to the
-in-cluster service would go here. Capture against an actual NebariApp
-deployment so the diagram reflects the real path.
-
-:::
 
 ## What the operator mutates at runtime
 
