@@ -10,8 +10,8 @@ const config = {
   tagline: 'Deploy Ray Serve on Nebari',
   favicon: 'img/favicon.ico',
 
-  url: 'https://nebari-rayserve-pack.netlify.app',
-  baseUrl: '/',
+  url: 'https://nebari-dev.github.io',
+  baseUrl: '/nebari-rayserve-pack/',
 
   organizationName: 'nebari-dev',
   projectName: 'nebari-rayserve-pack',
@@ -91,14 +91,6 @@ const config = {
         style: 'dark',
         links: [
           {
-            title: 'Docs',
-            items: [
-              {label: 'Get started', to: '/get-started/'},
-              {label: 'How-to guides', to: '/how-tos/'},
-              {label: 'Reference', to: '/references/'},
-            ],
-          },
-          {
             title: 'Source',
             items: [
               {
@@ -108,15 +100,6 @@ const config = {
               {
                 label: 'Nebari',
                 href: 'https://nebari.dev',
-              },
-            ],
-          },
-          {
-            title: 'Ray',
-            items: [
-              {
-                label: 'Ray Serve docs',
-                href: 'https://docs.ray.io/en/latest/serve/index.html',
               },
             ],
           },

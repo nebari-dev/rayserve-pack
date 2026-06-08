@@ -1,94 +1,14 @@
 ---
 title: Introduction
-description: An overview of the Nebari Ray Serve pack — deploy Ray Serve on Nebari and serve Python models behind an HTTP endpoint.
+description: Documentation for the Nebari Ray Serve pack — deploy Ray Serve on Nebari.
 slug: /
 sidebar_position: 1
+last_update:
+  date: 2026-06-04
 ---
 
-import DocCardList from '@theme/DocCardList';
+# Nebari Ray Serve Pack
 
-# Introduction
-
-## What is the Nebari Ray Serve pack?
-
-**The Nebari Ray Serve pack is a Nebari Software Pack that deploys
-[Ray Serve](https://docs.ray.io/en/latest/serve/index.html) on the Nebari kubernetes cluster.**
-It packages the [KubeRay operator](https://github.com/ray-project/kuberay),
-a [RayService](https://docs.ray.io/en/latest/serve/production-guide/kubernetes.html)
-custom resource, and the optional routing/TLS/OIDC layer provided by
-[nebari-operator](https://github.com/nebari-dev/nebari-operator) into one Helm chart.
-
-Once installed, Nebari users can deploy Python models behind an HTTP
-endpoint without requiring access to the underlying kubernetes cluster.
-
-## Why use this pack?
-
-Building a production Ray Serve deployment on Kubernetes typically involves:
-
-- Installing and operating the KubeRay operator.
-- Authoring a RayService spec with the right probe behavior for the
-  development phase (no apps deployed yet) and the production phase (apps
-  serving traffic).
-- Wiring the dashboard and serve endpoint through an ingress with TLS.
-- Bolting on OIDC auth so users can log in to the dashboard.
-
-The pack does all of this for you, with sensible defaults aimed at notebook
-users on a Nebari cluster. You install one chart and your data scientists
-get a working `ray://` endpoint and dashboard the same day.
-
-## Key features
-
-- **One-chart install** — KubeRay operator, RayService, and stable Kubernetes
-  Services come up together from a single Helm chart.
-- **Notebook-first defaults** — the serve endpoint is internal-only by
-  default, so notebooks on the cluster reach it via service DNS without
-  going through auth.
-- **Optional external exposure** — set `nebariapp.enabled: true` and the
-  pack provisions Envoy Gateway routing, TLS, and Keycloak OIDC for the
-  dashboard and (optionally) the serve endpoint.
-- **GPU-ready** — the chart understands `runtimeClassName: nvidia` and
-  `nvidia.com/gpu` resource requests on either the head pod, the worker
-  pool, or both.
-- **GitOps-friendly** — ships with the exact `ignoreDifferences` rules
-  ArgoCD needs to stay in sync with the KubeRay controller's runtime
-  mutations.
-
-## Who this is for
-
-- **Operators** installing the pack on a Kubernetes cluster (with or
-  without Nebari) → [Get started](./get-started/) walks through the
-  standalone and ArgoCD install paths.
-- **End users** with a notebook on a cluster that already has the pack
-  installed → [How-to guides](./how-tos/) covers connecting from a
-  notebook and deploying your first model.
-- **Anyone curious about how it fits together** →
-  [Architecture](./references/architecture) explains the Kubernetes
-  resources the chart creates and how they relate.
-
-## What this pack is not
-
-Ray Serve is a **model-serving** framework. This pack is tuned for serving
-HTTP endpoints, not for general Ray Data, Ray Tune, or Ray Train workloads.
-
-## Next steps
-
-<DocCardList items={[
-  {
-    type: 'link',
-    href: '/get-started/',
-    label: 'Get started',
-    description: 'Install the pack on a standalone cluster or via ArgoCD on Nebari.',
-  },
-  {
-    type: 'link',
-    href: '/how-tos/',
-    label: 'How-to guides',
-    description: 'Connect from a notebook, deploy a model, expose it externally.',
-  },
-  {
-    type: 'link',
-    href: '/references/',
-    label: 'Reference',
-    description: 'Full values.yaml reference, architecture diagrams, and the troubleshooting index.',
-  },
-]}/>
+:::note[Documentation in progress]
+This documentation site is being built out. Content is coming soon.
+:::
