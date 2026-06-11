@@ -66,7 +66,7 @@ Ray serve service name - RayService creates a service named <rayservice-name>-se
 Whether organization CA bundle injection is enabled.
 */}}
 {{- define "nebari-rayserve.orgCABundle.enabled" -}}
-{{- if and .Values.orgCABundle .Values.orgCABundle.secretName -}}
+{{- if and .Values.orgCABundle .Values.orgCABundle.configMapName -}}
 true
 {{- end }}
 {{- end }}
@@ -96,15 +96,15 @@ specs so the SSL_CERT_FILE bundle exists before the main container starts.
 {{- end }}
 
 {{/*
-Volumes block for the org-ca Secret (deployer-supplied) + the shared
+Volumes block for the org-ca ConfigMap (deployer-supplied) + the shared
 emptyDir that the initContainer writes the combined bundle into. Renders
 empty when orgCABundle injection is disabled.
 */}}
 {{- define "nebari-rayserve.orgCABundle.volumes" -}}
 {{- if include "nebari-rayserve.orgCABundle.enabled" . -}}
 - name: org-ca
-  secret:
-    secretName: {{ .Values.orgCABundle.secretName | quote }}
+  configMap:
+    name: {{ .Values.orgCABundle.configMapName | quote }}
 - name: combined-ca
   emptyDir: {}
 {{- end }}
@@ -113,7 +113,7 @@ empty when orgCABundle injection is disabled.
 {{/*
 Container volumeMounts for the combined-CA bundle (read-only). The main
 Ray container mounts only the combined-ca volume — it never sees the raw
-org-ca Secret. Renders empty when orgCABundle injection is disabled.
+org-ca ConfigMap. Renders empty when orgCABundle injection is disabled.
 */}}
 {{- define "nebari-rayserve.orgCABundle.volumeMounts" -}}
 {{- if include "nebari-rayserve.orgCABundle.enabled" . -}}

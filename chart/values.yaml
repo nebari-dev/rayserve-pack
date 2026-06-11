@@ -80,36 +80,44 @@ serveApplications: []
 # S3, etc.) succeed in environments running a TLS-inspecting proxy
 # (Netskope, Zscaler, BlueCoat, internal corporate CAs, etc.).
 #
-# When `secretName` is set, the chart adds:
+# When `configMapName` is set, the chart adds:
 #   - An initContainer that concatenates the base image's system trust store
 #     (/etc/ssl/certs/ca-certificates.crt) with the deployer-supplied CA
-#     (mounted from the Secret at the key `ca.crt`) into
+#     (mounted from the ConfigMap at the key `ca.crt`) into
 #     /shared/combined-ca.crt
 #   - A shared emptyDir volume that the main container mounts read-only
 #   - SSL_CERT_FILE / REQUESTS_CA_BUNDLE / CURL_CA_BUNDLE env vars on both
 #     head and worker pointing at /shared/combined-ca.crt
 #
-# When `secretName` is empty (default), nothing is rendered — the resulting
-# RayService is byte-identical to the no-CA-injection case.
+# When `configMapName` is empty (default), nothing is rendered — the
+# resulting RayService is byte-identical to the no-CA-injection case.
+#
+# Why ConfigMap rather than Secret: a CA certificate is public material
+# by design (the entire PKI trust model relies on root CAs being widely
+# distributed — Mozilla's bundle ships in every browser/OS, corporate
+# inspecting proxy roots are pushed to every device that traverses them).
+# Kubernetes itself uses a ConfigMap for the cluster's own CA distribution
+# (`kube-root-ca.crt`, auto-projected into every namespace). cert-manager's
+# trust-manager subproject distributes CA bundles as ConfigMaps via its
+# Bundle CR. We follow that precedent here.
 #
 # Known coverage gap: httpx clients constructed with the default
 # `verify=True` hardcode `cafile=certifi.where()` and ignore SSL_CERT_FILE.
 # Application code that needs its httpx calls covered must pass
 # `verify=ssl.create_default_context()` (or equivalent) explicitly.
 #
-# Secret shape (created out-of-band, e.g. by your gitops layer):
+# ConfigMap shape (created out-of-band, e.g. by your gitops layer):
 #   apiVersion: v1
-#   kind: Secret
+#   kind: ConfigMap
 #   metadata:
 #     name: org-ca-bundle
-#   type: Opaque
-#   stringData:
+#   data:
 #     ca.crt: |
 #       -----BEGIN CERTIFICATE-----
 #       ...your org CA...
 #       -----END CERTIFICATE-----
 orgCABundle:
-  secretName: ""
+  configMapName: ""
   # Image used by the initContainer that builds the combined CA bundle.
   # Only needs `sh` and `cat` — defaults to a tiny Alpine image.
   initImage: "alpine:3.20"

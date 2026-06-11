@@ -227,21 +227,20 @@ Key values in `chart/values.yaml`:
 
 ### Organization CA Bundle Injection
 
-For deployments behind a TLS-inspecting proxy (Netskope, Zscaler, BlueCoat, internal corporate CAs, etc.), point `orgCABundle.secretName` at a Secret containing your organization's root CA. The chart adds an initContainer that builds a combined CA bundle (system trust + org CA), mounts it into the head and worker pods, and sets `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `CURL_CA_BUNDLE` so any TLS client honoring those env vars (requests, urllib3, curl, git, pip, `torch.hub`, etc.) trusts the proxy's re-signed certs.
+For deployments behind a TLS-inspecting proxy (Netskope, Zscaler, BlueCoat, internal corporate CAs, etc.), point `orgCABundle.configMapName` at a ConfigMap containing your organization's root CA. The chart adds an initContainer that builds a combined CA bundle (system trust + org CA), mounts it into the head and worker pods, and sets `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `CURL_CA_BUNDLE` so any TLS client honoring those env vars (requests, urllib3, curl, git, pip, `torch.hub`, etc.) trusts the proxy's re-signed certs.
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `orgCABundle.secretName` | `""` | Name of a Secret with key `ca.crt` containing the org CA (PEM). Empty disables injection — no behavior change. |
+| `orgCABundle.configMapName` | `""` | Name of a ConfigMap with key `ca.crt` containing the org CA (PEM). Empty disables injection — no behavior change. |
 | `orgCABundle.initImage` | `alpine:3.20` | Image used by the bundle-building initContainer. Only needs `sh` + `cat`. |
 
 ```yaml
-# Create the Secret out-of-band (gitops, kubectl, sealed-secrets, etc.):
+# Create the ConfigMap out-of-band (gitops, kubectl, etc.):
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
   name: org-ca-bundle
-type: Opaque
-stringData:
+data:
   ca.crt: |
     -----BEGIN CERTIFICATE-----
     ...your org CA...
@@ -249,8 +248,10 @@ stringData:
 ---
 # Then point the chart at it:
 orgCABundle:
-  secretName: org-ca-bundle
+  configMapName: org-ca-bundle
 ```
+
+> **Why ConfigMap rather than Secret?** A CA certificate is public material by design — the PKI trust model relies on root CAs being widely distributed. Kubernetes itself uses a ConfigMap for the cluster's own CA distribution (`kube-root-ca.crt`, auto-projected into every namespace), and cert-manager's trust-manager subproject does the same. Use a ConfigMap here; reserve Secret for things that actually need confidentiality (private keys, OAuth client secrets, etc.).
 
 **Coverage caveat — httpx default `verify=True`:** httpx hardcodes its SSL context to `cafile=certifi.where()`, which means it **ignores** `SSL_CERT_FILE`. Application code making httpx calls that need to traverse a TLS-inspecting proxy must construct an explicit context:
 
