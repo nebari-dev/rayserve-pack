@@ -27,6 +27,10 @@ spec:
           {{- with .Values.head.runtimeClassName }}
           runtimeClassName: {{ . }}
           {{- end }}
+          {{- with (include "nebari-rayserve.tolerations" .Values.head) }}
+          tolerations:
+            {{- . | nindent 12 }}
+          {{- end }}
           containers:
             - name: ray-head
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -63,6 +67,10 @@ spec:
           spec:
             {{- with .Values.worker.runtimeClassName }}
             runtimeClassName: {{ . }}
+            {{- end }}
+            {{- with (include "nebari-rayserve.tolerations" .Values.worker) }}
+            tolerations:
+              {{- . | nindent 14 }}
             {{- end }}
             containers:
               - name: ray-worker

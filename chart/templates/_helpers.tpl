@@ -61,3 +61,30 @@ Ray serve service name - RayService creates a service named <rayservice-name>-se
 {{- define "nebari-rayserve.serve-service-name" -}}
 {{- printf "%s-serve-svc" (include "nebari-rayserve.fullname" .) }}
 {{- end }}
+
+{{/*
+Tolerations for a Ray group (head or worker). Pass the group config
+(.Values.head or .Values.worker).
+
+When the group's resources request an NVIDIA GPU, the nvidia.com/gpu
+toleration is injected automatically so GPU pods can schedule onto nodes
+tainted nvidia.com/gpu=...:NoSchedule (e.g. nebari-infrastructure-core's
+auto-tainted AWS GPU node groups). operator: Exists matches any taint
+value. Any explicit tolerations from the group config are appended.
+
+Renders nothing when no GPU is requested and no explicit tolerations are
+set, so non-GPU pods are unchanged.
+*/}}
+{{- define "nebari-rayserve.tolerations" -}}
+{{- $config := . -}}
+{{- $tolerations := $config.tolerations | default list -}}
+{{- $resources := $config.resources | default dict -}}
+{{- $limits := $resources.limits | default dict -}}
+{{- $requests := $resources.requests | default dict -}}
+{{- if or (hasKey $limits "nvidia.com/gpu") (hasKey $requests "nvidia.com/gpu") -}}
+{{- $tolerations = append $tolerations (dict "key" "nvidia.com/gpu" "operator" "Exists" "effect" "NoSchedule") -}}
+{{- end -}}
+{{- if $tolerations -}}
+{{- toYaml $tolerations -}}
+{{- end -}}
+{{- end }}
