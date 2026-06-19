@@ -35,6 +35,10 @@ spec:
           volumes:
             {{- . | nindent 12 }}
           {{- end }}
+          {{- with (include "nebari-rayserve.tolerations" .Values.head) }}
+          tolerations:
+            {{- . | nindent 12 }}
+          {{- end }}
           containers:
             - name: ray-head
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -83,6 +87,10 @@ spec:
             {{- end }}
             {{- with (include "nebari-rayserve.orgCABundle.volumes" .) }}
             volumes:
+              {{- . | nindent 14 }}
+            {{- end }}
+            {{- with (include "nebari-rayserve.tolerations" .Values.worker) }}
+            tolerations:
               {{- . | nindent 14 }}
             {{- end }}
             containers:

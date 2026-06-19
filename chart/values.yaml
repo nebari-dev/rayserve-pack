@@ -145,6 +145,12 @@ head:
       cpu: "1"
       memory: "2Gi"
 
+  # Extra tolerations for the head pod. The nvidia.com/gpu toleration is
+  # injected automatically when resources above request nvidia.com/gpu, so
+  # GPU pods schedule onto nodes tainted nvidia.com/gpu=...:NoSchedule. Add
+  # any additional tolerations here.
+  tolerations: []
+
   # Head pod readiness/liveness probes. Defaults to {} which lets KubeRay
   # apply its built-in probes. Override here to set explicit probes; see
   # the worker.readinessProbe / worker.livenessProbe block below for the
@@ -168,6 +174,12 @@ worker:
     requests:
       cpu: "1"
       memory: "2Gi"
+
+  # Extra tolerations for worker pods. The nvidia.com/gpu toleration is
+  # injected automatically when resources above request nvidia.com/gpu, so
+  # GPU workers schedule onto nodes tainted nvidia.com/gpu=...:NoSchedule.
+  # Add any additional tolerations here.
+  tolerations: []
 
   # Worker pod readiness/liveness probes.
   #
