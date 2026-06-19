@@ -123,6 +123,7 @@ spec:
 - `managedNamespaceMetadata` with `nebari.dev/managed: "true"` is required for the nebari-operator to manage NebariApp resources
 - `redirectURI` must be `/oauth2/callback` (Envoy Gateway rejects `/`)
 - Set `serve.enabled: false` to keep the serve endpoint internal-only (recommended — notebooks access it via cluster DNS)
+- The `/spec/rayClusterConfig` ignore rule combined with `RespectIgnoreDifferences=true` makes ArgoCD stop managing everything under `rayClusterConfig`. If you enable [`orgCABundle`](#organization-ca-bundle-injection), the CA injection lives under that path and will **silently not apply** — see the ArgoCD footgun warning in that section before turning it on.
 
 ## Connecting from Jupyter
 
@@ -224,6 +225,50 @@ Key values in `chart/values.yaml`:
 | Value | Default | Description |
 |-------|---------|-------------|
 | `serveApplications` | `[]` | Declarative Serve applications (see [Ray Serve config](https://docs.ray.io/en/latest/serve/production-guide/config.html)) |
+
+### Organization CA Bundle Injection
+
+For deployments behind a TLS-inspecting proxy (Netskope, Zscaler, BlueCoat, internal corporate CAs, etc.), point `orgCABundle.configMapName` at a ConfigMap containing your organization's root CA. The chart adds an initContainer that builds a combined CA bundle (system trust + org CA), mounts it into the head and worker pods, and sets `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `CURL_CA_BUNDLE` / `GIT_SSL_CAINFO` so any TLS client honoring those env vars (requests, urllib3, curl, git, pip, `torch.hub`, etc.) trusts the proxy's re-signed certs.
+
+`GIT_SSL_CAINFO` is set in addition to the three OpenSSL env vars because git's libcurl ignores `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `CURL_CA_BUNDLE` and reads only `GIT_SSL_CAINFO`. Without it, `pip install git+https://...` and other git-over-HTTPS operations in worker contexts fail certificate verification even though plain `requests`/`pip` calls succeed.
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `orgCABundle.configMapName` | `""` | Name of a ConfigMap with key `ca.crt` containing the org CA (PEM). Empty disables injection — no behavior change. |
+| `orgCABundle.initImage` | `alpine:3.20` | Image used by the bundle-building initContainer. Only needs `sh` + `cat`. |
+
+```yaml
+# Create the ConfigMap out-of-band (gitops, kubectl, etc.):
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: org-ca-bundle
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    ...your org CA...
+    -----END CERTIFICATE-----
+---
+# Then point the chart at it:
+orgCABundle:
+  configMapName: org-ca-bundle
+```
+
+> **Why ConfigMap rather than Secret?** A CA certificate is public material by design — the PKI trust model relies on root CAs being widely distributed. Kubernetes itself uses a ConfigMap for the cluster's own CA distribution (`kube-root-ca.crt`, auto-projected into every namespace), and cert-manager's trust-manager subproject does the same. Use a ConfigMap here; reserve Secret for things that actually need confidentiality (private keys, OAuth client secrets, etc.).
+
+> **⚠️ ArgoCD footgun — the CA bundle silently won't apply.** The ArgoCD `Application` shown under [On a Nebari cluster (via ArgoCD)](#on-a-nebari-cluster-via-argocd) sets `RespectIgnoreDifferences=true` together with an `ignoreDifferences` rule on `/spec/rayClusterConfig`. With server-side apply, that combination tells ArgoCD to **stop managing every field under `rayClusterConfig`** — which is exactly where this chart injects the initContainer, volumes, volumeMounts, and CA env vars for the head and worker pods. The result is a silent failure: ArgoCD reports a healthy, fully-synced `Application`, but the running RayService never gets the CA bundle, and TLS calls keep failing with `CERTIFICATE_VERIFY_FAILED`.
+>
+> If you enable `orgCABundle` on a cluster managed by ArgoCD with the example sync policy, you must **narrow the ignore rule** so the CA fields are still reconciled. The broad `/spec/rayClusterConfig` ignore exists only to suppress the autoscaler/runtime mutations KubeRay makes; replace it with targeted pointers (or drop it and ignore only the specific subpaths KubeRay rewrites). After changing it, confirm the head and worker pods actually carry `SSL_CERT_FILE` (`kubectl exec ... -- printenv SSL_CERT_FILE`) rather than trusting the ArgoCD sync status. See [#17](https://github.com/nebari-dev/nebari-rayserve-pack/issues/17) for details.
+
+**Coverage caveat — httpx default `verify=True`:** httpx hardcodes its SSL context to `cafile=certifi.where()`, which means it **ignores** `SSL_CERT_FILE`. Application code making httpx calls that need to traverse a TLS-inspecting proxy must construct an explicit context:
+
+```python
+import ssl, httpx
+client = httpx.Client(verify=ssl.create_default_context())
+# or per-call: httpx.get(url, verify=ssl.create_default_context())
+```
+
+`ssl.create_default_context()` with no `cafile=` honors `SSL_CERT_FILE` / `SSL_CERT_DIR` per the standard OpenSSL convention, so it picks up the bundle this chart injected. Other Python HTTP clients (`requests`, `urllib3`, stdlib `urllib`) and most non-Python TLS tooling honor the env vars automatically.
 
 ## Architecture
 

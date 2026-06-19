@@ -27,6 +27,14 @@ spec:
           {{- with .Values.head.runtimeClassName }}
           runtimeClassName: {{ . }}
           {{- end }}
+          {{- with (include "nebari-rayserve.orgCABundle.initContainers" .) }}
+          initContainers:
+            {{- . | nindent 12 }}
+          {{- end }}
+          {{- with (include "nebari-rayserve.orgCABundle.volumes" .) }}
+          volumes:
+            {{- . | nindent 12 }}
+          {{- end }}
           {{- with (include "nebari-rayserve.tolerations" .Values.head) }}
           tolerations:
             {{- . | nindent 12 }}
@@ -34,9 +42,14 @@ spec:
           containers:
             - name: ray-head
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-              {{- with .Values.head.containerEnv }}
+              {{- $headEnv := concat (.Values.head.containerEnv | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.env" .)) }}
+              {{- with $headEnv }}
               env:
                 {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with (include "nebari-rayserve.orgCABundle.volumeMounts" .) }}
+              volumeMounts:
+                {{- . | nindent 16 }}
               {{- end }}
               resources:
                 {{- toYaml .Values.head.resources | nindent 16 }}
@@ -68,6 +81,14 @@ spec:
             {{- with .Values.worker.runtimeClassName }}
             runtimeClassName: {{ . }}
             {{- end }}
+            {{- with (include "nebari-rayserve.orgCABundle.initContainers" .) }}
+            initContainers:
+              {{- . | nindent 14 }}
+            {{- end }}
+            {{- with (include "nebari-rayserve.orgCABundle.volumes" .) }}
+            volumes:
+              {{- . | nindent 14 }}
+            {{- end }}
             {{- with (include "nebari-rayserve.tolerations" .Values.worker) }}
             tolerations:
               {{- . | nindent 14 }}
@@ -75,9 +96,14 @@ spec:
             containers:
               - name: ray-worker
                 image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-                {{- with .Values.worker.containerEnv }}
+                {{- $workerEnv := concat (.Values.worker.containerEnv | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.env" .)) }}
+                {{- with $workerEnv }}
                 env:
                   {{- toYaml . | nindent 18 }}
+                {{- end }}
+                {{- with (include "nebari-rayserve.orgCABundle.volumeMounts" .) }}
+                volumeMounts:
+                  {{- . | nindent 18 }}
                 {{- end }}
                 resources:
                   {{- toYaml .Values.worker.resources | nindent 18 }}
