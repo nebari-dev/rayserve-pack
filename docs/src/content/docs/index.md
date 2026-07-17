@@ -1,10 +1,6 @@
 ---
 title: Introduction
 description: Documentation for the Nebari Ray Serve pack — deploy Ray Serve on Nebari.
-slug: /
-sidebar_position: 1
-last_update:
-  date: 2026-06-04
 ---
 
 # Nebari Ray Serve Pack
