@@ -1,0 +1,29 @@
+name: Release Chart
+
+# Releases the chart via the shared reusable workflow in nebari-dev/.github.
+# Fires on any push to main that modifies chart/Chart.yaml — typically a
+# version bump. The reusable workflow reads chart/Chart.yaml, checks whether
+# a matching GitHub Release already exists, packages the chart, creates a
+# Release named `<chart-name>-<version>`, and opens a PR against
+# nebari-dev/helm-repository which then syncs to quay.io/nebari/charts.
+#
+# See https://github.com/nebari-dev/software-pack-template for the pattern
+# this workflow follows.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "chart/Chart.yaml"
+
+jobs:
+  release:
+    uses: nebari-dev/.github/.github/workflows/pack-release.yaml@v1
+    with:
+      chart-path: chart
+      chart-name: nebari-rayserve-pack
+      # No first-party image tags to pin — chart references
+      # rayproject/ray from Docker Hub, not nebari-owned images.
+      tag-paths: ""
+    secrets:
+      NEBARI_HELM_REPO_TOKEN: ${{ secrets.NEBARI_HELM_REPO_TOKEN }}
