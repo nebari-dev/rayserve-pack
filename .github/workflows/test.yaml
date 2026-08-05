@@ -204,13 +204,24 @@ jobs:
           fi
           echo "Denied as expected"
 
+      # Retried with fresh pods: Calico's dataplane can lag a few seconds
+      # behind a newly created namespace before the namespaceSelector match
+      # takes effect, so a single one-shot curl is flaky.
       - name: Allowed — allow-listed namespace reaches the dashboard
         run: |
           kubectl create namespace client-ns
-          kubectl run allow-test -n client-ns --restart=Never --image=curlimages/curl -- \
-            curl -m 15 --retry 3 -sf http://rayserve-nebari-rayserve-pack-head-svc.default:8265/api/version
-          kubectl wait -n client-ns --for=jsonpath='{.status.phase}'=Succeeded pod/allow-test --timeout=90s
-          echo "Allowed as expected"
+          for i in $(seq 1 6); do
+            if kubectl run allow-test-$i -n client-ns --restart=Never --rm --attach \
+                 --image=curlimages/curl -- \
+                 curl -m 10 -sf http://rayserve-nebari-rayserve-pack-head-svc.default:8265/api/version; then
+              echo "Allowed as expected (attempt $i)"
+              exit 0
+            fi
+            echo "attempt $i failed, retrying..."
+            sleep 10
+          done
+          echo "ERROR: allow-listed namespace never reached the Ray dashboard"
+          exit 1
 
       - name: Debug info on failure
         if: failure()
