@@ -228,7 +228,7 @@ Egress is deliberately **not** restricted — Ray workloads legitimately fetch m
 - Your CNI must enforce NetworkPolicy (Calico, Cilium, …). kind's default kindnet silently enforces nothing.
 - `podSelector` inside an `allowedClients` entry matches labels on pods in *that* namespace — with one release per namespace, `app.kubernetes.io/component: api` is unambiguous for checkmaite.
 - Extra ingress (e.g. Prometheus scraping) goes in `networkPolicy.extraIngress` as raw rules.
-- NetworkPolicy restricts *who can connect*; traffic is still plaintext and any allowed client is fully trusted by Ray. In-transit mTLS (`RAY_USE_TLS`) is a tracked follow-up.
+- NetworkPolicy restricts *who can connect*; traffic is still plaintext and any allowed client is fully trusted by Ray. In-transit mTLS (`RAY_USE_TLS`) is a tracked follow-up — see [#29](https://github.com/nebari-dev/rayserve-pack/issues/29).
 
 ### Pod hardening (on by default)
 
