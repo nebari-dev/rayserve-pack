@@ -114,14 +114,15 @@ jobs:
           helm install kuberay-operator chart/charts/kuberay-operator-*.tgz \
             --wait --timeout 3m
 
-      # networkPolicy.enabled is smoke-only here: this kind cluster runs
-      # kindnet, which does not enforce NetworkPolicy. Enforcement is covered
-      # by the netpol-enforced job in test.yaml (Calico).
+      # networkPolicy stays OFF here: recent kind versions enforce
+      # NetworkPolicy via kube-network-policies, and this job's port-forward
+      # health checks don't match any allow rule. Enforcement coverage lives
+      # in test.yaml's netpol-enforced job; rendering with NebariApp+netpol
+      # combined is covered by the lint permutations.
       - name: Deploy Ray Serve with NebariApp
         run: |
           helm install rayserve chart/ \
             --set kuberay-operator.enabled=false \
-            --set networkPolicy.enabled=true \
             --set nebariapp.enabled=true \
             --set nebariapp.hostname=rayserve.nebari.local \
             --set nebariapp.serve.enabled=true \
@@ -165,7 +166,7 @@ jobs:
 
       - name: Health check Ray Dashboard via port-forward
         run: |
-          kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 &
+          kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 &
           sleep 5
           curl -sf http://localhost:8265/api/version
           kill %1

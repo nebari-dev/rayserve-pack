@@ -29,16 +29,16 @@ jobs:
           helm install kuberay-operator chart/charts/kuberay-operator-*.tgz \
             --wait --timeout 3m
 
-      # networkPolicy.enabled=true here only proves the policies apply cleanly
-      # and pods still reconcile — kind's default CNI (kindnet) does NOT
-      # enforce NetworkPolicy. Enforcement is proven by the netpol-enforced
-      # job below (Calico).
+      # Baseline job: networkPolicy stays OFF here so the port-forward health
+      # check exercises the unrestricted path (recent kind versions enforce
+      # NetworkPolicy via kube-network-policies, which would block traffic
+      # that doesn't match a rule). NetworkPolicy coverage lives in the
+      # netpol-enforced job below.
       - name: Install chart (standalone, no NebariApp)
         run: |
           helm install rayserve chart/ \
             --set kuberay-operator.enabled=false \
             --set nebariapp.enabled=false \
-            --set networkPolicy.enabled=true \
             --set head.resources.requests.cpu=500m \
             --set head.resources.requests.memory=512Mi \
             --set head.resources.limits.cpu=1 \
@@ -83,7 +83,7 @@ jobs:
 
       - name: Health check Ray Dashboard
         run: |
-          kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 &
+          kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 &
           sleep 5
           curl -sf http://localhost:8265/api/version
           kill %1
@@ -131,6 +131,10 @@ jobs:
       - name: Install Calico
         run: |
           kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/tigera-operator.yaml
+          # custom-resources.yaml needs the operator's CRDs registered first —
+          # applying immediately races CRD establishment and fails with
+          # "no matches for kind Installation".
+          kubectl wait --for condition=established crd/installations.operator.tigera.io --timeout=120s
           kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/custom-resources.yaml
           echo "Waiting for Calico..."
           for i in $(seq 1 60); do
@@ -192,7 +196,7 @@ jobs:
         run: |
           set +e
           kubectl run deny-test --restart=Never --image=curlimages/curl -- \
-            curl -m 5 -sf http://rayserve-nebari-rayserve-head-svc:8265/api/version
+            curl -m 5 -sf http://rayserve-nebari-rayserve-pack-head-svc:8265/api/version
           kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/deny-test --timeout=60s
           if [ $? -eq 0 ]; then
             echo "ERROR: unlisted pod reached the Ray dashboard — policy not enforced"
@@ -204,7 +208,7 @@ jobs:
         run: |
           kubectl create namespace client-ns
           kubectl run allow-test -n client-ns --restart=Never --image=curlimages/curl -- \
-            curl -m 15 --retry 3 -sf http://rayserve-nebari-rayserve-head-svc.default:8265/api/version
+            curl -m 15 --retry 3 -sf http://rayserve-nebari-rayserve-pack-head-svc.default:8265/api/version
           kubectl wait -n client-ns --for=jsonpath='{.status.phase}'=Succeeded pod/allow-test --timeout=90s
           echo "Allowed as expected"
 

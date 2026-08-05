@@ -40,10 +40,10 @@ Access via port-forward:
 
 ```bash
 # Ray Dashboard
-kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 -n rayserve
 
 # Ray Serve endpoint
-kubectl port-forward svc/rayserve-nebari-rayserve-serve-svc 8000:8000 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-serve-svc 8000:8000 -n rayserve
 ```
 
 ### On a Nebari cluster (via ArgoCD)
@@ -135,7 +135,7 @@ from ray import serve
 import requests
 
 # Connect to the Ray cluster
-ray.init("ray://rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001")
+ray.init("ray://rayserve-nebari-rayserve-pack-head-svc.rayserve.svc.cluster.local:10001")
 
 # Deploy a model
 @serve.deployment
@@ -146,7 +146,7 @@ class Hello:
 serve.run(Hello.bind(), name="hello", route_prefix="/hello")
 
 # Run inference
-resp = requests.get("http://rayserve-nebari-rayserve-serve-svc.rayserve.svc.cluster.local:8000/hello")
+resp = requests.get("http://rayserve-nebari-rayserve-pack-serve-svc.rayserve.svc.cluster.local:8000/hello")
 print(resp.text)
 # Hello from Ray Serve!
 ```
@@ -418,7 +418,7 @@ The NebariApp may be pointing at a service that doesn't exist. Check the actual 
 kubectl get svc -n rayserve
 ```
 
-The stable services are `<release>-nebari-rayserve-head-svc` and `<release>-nebari-rayserve-serve-svc`.
+The stable services are `<release>-nebari-rayserve-pack-head-svc` and `<release>-nebari-rayserve-pack-serve-svc`.
 
 ### Version mismatch connecting from Jupyter
 

@@ -144,8 +144,8 @@ up-standalone:
 	@echo "Ray Serve deployed (standalone, no NebariApp)."
 	@echo ""
 	@echo "Access via port-forward:"
-	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-serve-svc 8000:8000"
-	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265"
+	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-pack-serve-svc 8000:8000"
+	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265"
 
 # --------------------------------------------------------------------------
 # update-hosts - update /etc/hosts with all NebariApp hostnames
