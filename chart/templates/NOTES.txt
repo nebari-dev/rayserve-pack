@@ -25,6 +25,35 @@ To access locally:
 
 {{- end }}
 
+=== Security ===
+
+{{- if .Values.networkPolicy.enabled }}
+
+NetworkPolicy is ENABLED. Ingress to Ray pods is restricted to:
+  - other Ray pods and the kuberay-operator (this namespace)
+  - gateway namespace(s): {{ join ", " .Values.networkPolicy.gatewayNamespaces }} -> head 8265/8000
+  {{- if .Values.networkPolicy.allowedClients }}
+  - allowed clients:
+    {{- range .Values.networkPolicy.allowedClients }}
+    - namespace {{ .namespace }} -> ports {{ join ", " (.ports | default (list 10001 8000 8265)) }}
+    {{- end }}
+  {{- else }}
+  - NO cross-namespace clients: ray.init()/job submission from other
+    namespaces (Jupyter, checkmaite, ...) will be BLOCKED until you add
+    networkPolicy.allowedClients entries.
+  {{- end }}
+
+Verify the gateway namespace matches your cluster (kubernetes.io/metadata.name):
+  kubectl get pods -A -o wide | grep -i envoy
+Your CNI must enforce NetworkPolicy (Calico, Cilium, ...); kindnet does not.
+{{- else }}
+
+WARNING: networkPolicy.enabled=false — Ray's client (10001), GCS (6379),
+and dashboard/job API (8265) ports have NO authentication; any pod in the
+cluster can execute code on this Ray cluster. Consider setting
+networkPolicy.enabled=true and allow-listing clients.
+{{- end }}
+
 === Deploying Models ===
 
 Option 1: Declarative (recommended for production)
