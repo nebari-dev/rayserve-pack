@@ -40,3 +40,46 @@ jobs:
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=dashboard.example.com \
             --set nebariapp.auth.enabled=true
+
+      - name: Template chart (NetworkPolicy enabled + allowed client)
+        run: |
+          helm template test chart/ \
+            --set networkPolicy.enabled=true \
+            --set networkPolicy.allowedClients[0].namespace=checkmaite \
+            --set networkPolicy.allowedClients[0].ports[0]=10001 \
+            | tee /tmp/netpol.yaml | grep -q "kind: NetworkPolicy"
+          count=$(grep -c "kind: NetworkPolicy" /tmp/netpol.yaml)
+          test "$count" -eq 2 || { echo "expected 2 NetworkPolicies, got $count"; exit 1; }
+          grep -q "kubernetes.io/metadata.name: checkmaite" /tmp/netpol.yaml
+
+      - name: Template chart (ResourceQuota + LimitRange enabled)
+        run: |
+          helm template test chart/ \
+            --set resourceQuota.enabled=true \
+            --set limitRange.enabled=true \
+            | tee /tmp/quota.yaml >/dev/null
+          grep -q "kind: ResourceQuota" /tmp/quota.yaml
+          grep -q "kind: LimitRange" /tmp/quota.yaml
+
+      - name: Template chart (orgCABundle + scheduling values)
+        run: |
+          helm template test chart/ \
+            --set orgCABundle.configMapName=org-ca \
+            --set head.nodeSelector.pool=gpu \
+            --set head.priorityClassName=high \
+            | tee /tmp/sched.yaml >/dev/null
+          # initContainer must render non-root alongside the pod-level
+          # runAsNonRoot default, or pods are rejected by the kubelet.
+          grep -q "name: build-ca-bundle" /tmp/sched.yaml
+          test "$(grep -c "runAsNonRoot: true" /tmp/sched.yaml)" -ge 4
+          grep -q "pool: gpu" /tmp/sched.yaml
+          grep -q "priorityClassName: high" /tmp/sched.yaml
+
+      - name: Default render regression guard (securityContext asserted)
+        run: |
+          helm template test chart/ | tee /tmp/default.yaml >/dev/null
+          # head pod + worker pod securityContext
+          rayservice=$(helm template test chart/ --show-only templates/rayservice.yaml)
+          test "$(echo "$rayservice" | grep -c "runAsNonRoot: true")" -eq 2
+          test "$(echo "$rayservice" | grep -c "serviceAccountName:")" -eq 2
+          test "$(echo "$rayservice" | grep -c "automountServiceAccountToken: false")" -eq 2

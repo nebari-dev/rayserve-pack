@@ -114,10 +114,14 @@ jobs:
           helm install kuberay-operator chart/charts/kuberay-operator-*.tgz \
             --wait --timeout 3m
 
+      # networkPolicy.enabled is smoke-only here: this kind cluster runs
+      # kindnet, which does not enforce NetworkPolicy. Enforcement is covered
+      # by the netpol-enforced job in test.yaml (Calico).
       - name: Deploy Ray Serve with NebariApp
         run: |
           helm install rayserve chart/ \
             --set kuberay-operator.enabled=false \
+            --set networkPolicy.enabled=true \
             --set nebariapp.enabled=true \
             --set nebariapp.hostname=rayserve.nebari.local \
             --set nebariapp.serve.enabled=true \
