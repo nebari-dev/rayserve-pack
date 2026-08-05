@@ -174,6 +174,11 @@ jobs:
       # ============================================================
       # Test: Upgrade to enable auth
       # ============================================================
+      # Must repeat the install step's resource/replica overrides: omitting
+      # them reverts the RayService to chart-default sizing, which triggers a
+      # zero-downtime cluster replacement (old + new clusters running at
+      # once) that doesn't reliably fit the runner and times out --wait. The
+      # auth flip should not touch the Ray cluster at all.
       - name: Upgrade with auth enabled
         run: |
           helm upgrade rayserve chart/ \
@@ -184,6 +189,11 @@ jobs:
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=ray-dashboard.nebari.local \
             --set nebariapp.auth.enabled=true \
+            --set head.resources.requests.cpu=500m \
+            --set head.resources.requests.memory=512Mi \
+            --set head.resources.limits.cpu=1 \
+            --set head.resources.limits.memory=1Gi \
+            --set worker.replicas=0 \
             --wait --timeout 5m
 
       - name: Verify SecurityPolicies created
