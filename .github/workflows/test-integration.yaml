@@ -149,10 +149,10 @@ jobs:
           kubectl wait --for=condition=ready pod -l ray.io/node-type=head --timeout=300s
 
       - name: Verify NebariApp (serve)
-        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve --timeout=300s
+        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-pack --timeout=300s
 
       - name: Verify NebariApp (dashboard)
-        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-dashboard --timeout=300s
+        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-pack-dashboard --timeout=300s
 
       - name: Verify HTTPRoutes created
         run: |
