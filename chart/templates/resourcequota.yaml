@@ -1,0 +1,14 @@
+{{- if .Values.resourceQuota.enabled }}
+# Namespace resource cap for the Ray cluster. Size the hard limits for TWO
+# full clusters: RayService zero-downtime upgrades run the old and new
+# RayCluster simultaneously, and a tight quota wedges the upgrade.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "nebari-rayserve.fullname" . }}
+  labels:
+    {{- include "nebari-rayserve.labels" . | nindent 4 }}
+spec:
+  hard:
+    {{- toYaml .Values.resourceQuota.hard | nindent 4 }}
+{{- end }}

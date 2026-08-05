@@ -24,8 +24,25 @@ spec:
         dashboard-host: "0.0.0.0"
       template:
         spec:
+          serviceAccountName: {{ include "nebari-rayserve.serviceAccountName" . }}
+          automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+          {{- with .Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.head.runtimeClassName }}
           runtimeClassName: {{ . }}
+          {{- end }}
+          {{- with .Values.head.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.head.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.head.priorityClassName }}
+          priorityClassName: {{ . }}
           {{- end }}
           {{- with (include "nebari-rayserve.orgCABundle.initContainers" .) }}
           initContainers:
@@ -42,6 +59,10 @@ spec:
           containers:
             - name: ray-head
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              {{- with .Values.containerSecurityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
               {{- $headEnv := concat (.Values.head.containerEnv | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.env" .)) }}
               {{- with $headEnv }}
               env:
@@ -78,8 +99,25 @@ spec:
         rayStartParams: {}
         template:
           spec:
+            serviceAccountName: {{ include "nebari-rayserve.serviceAccountName" . }}
+            automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+            {{- with .Values.podSecurityContext }}
+            securityContext:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
             {{- with .Values.worker.runtimeClassName }}
             runtimeClassName: {{ . }}
+            {{- end }}
+            {{- with .Values.worker.nodeSelector }}
+            nodeSelector:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.worker.affinity }}
+            affinity:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.worker.priorityClassName }}
+            priorityClassName: {{ . }}
             {{- end }}
             {{- with (include "nebari-rayserve.orgCABundle.initContainers" .) }}
             initContainers:
@@ -96,6 +134,10 @@ spec:
             containers:
               - name: ray-worker
                 image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+                {{- with .Values.containerSecurityContext }}
+                securityContext:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
                 {{- $workerEnv := concat (.Values.worker.containerEnv | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.env" .)) }}
                 {{- with $workerEnv }}
                 env:

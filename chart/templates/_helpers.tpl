@@ -63,6 +63,17 @@ Ray serve service name - RayService creates a service named <rayservice-name>-se
 {{- end }}
 
 {{/*
+Name of the ServiceAccount used by the Ray head and worker pods.
+*/}}
+{{- define "nebari-rayserve.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "nebari-rayserve.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
 Whether organization CA bundle injection is enabled.
 */}}
 {{- define "nebari-rayserve.orgCABundle.enabled" -}}
@@ -80,6 +91,20 @@ specs so the SSL_CERT_FILE bundle exists before the main container starts.
 {{- if include "nebari-rayserve.orgCABundle.enabled" . -}}
 - name: build-ca-bundle
   image: {{ .Values.orgCABundle.initImage | quote }}
+  # Explicit non-root securityContext: the default podSecurityContext sets
+  # runAsNonRoot: true, which the kubelet enforces on initContainers too —
+  # alpine would otherwise start as root and be rejected. Reading the
+  # ConfigMap and the system trust store needs no privileges, and the pod's
+  # fsGroup makes the shared emptyDir group-writable. Deliberately NOT
+  # driven by .Values.containerSecurityContext: this container's needs are
+  # fixed and known.
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 100
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
   command:
     - sh
     - -c
