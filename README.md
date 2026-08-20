@@ -329,7 +329,28 @@ nebari-rayserve-pack/
       NOTES.txt                # Post-install usage instructions
   dev/
     Makefile                   # Local dev with full Nebari stack on kind
+  docs/                        # Astro + Starlight documentation site
 ```
+
+## Documentation
+
+The docs site lives in [`docs/`](docs/) and is built with [Astro](https://astro.build) +
+[Starlight](https://starlight.astro.build) using the shared `@nebari/starlight` theme. It
+deploys to [packs.nebari.dev/rayserve-pack/](https://packs.nebari.dev/rayserve-pack/) on
+every merge to `main`; pull requests that touch `docs/` get a preview URL posted as a
+comment.
+
+```bash
+cd docs
+npm ci
+npm run dev     # dev server with hot reload at http://localhost:4321
+npm run build   # static build into docs/dist/
+npm test        # unit tests
+```
+
+Pages live in `docs/src/content/docs/` - each `.md` or `.mdx` file becomes a page, and the
+sidebar is configured in `docs/astro.config.mjs`. See [`docs/README.md`](docs/README.md) for
+details.
 
 ## Troubleshooting
 
