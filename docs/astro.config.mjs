@@ -20,7 +20,7 @@ export default defineConfig({
   site: SITE,
   integrations: [
     starlight({
-      title: 'Nebari Ray Serve Pack',
+      title: 'Nebari Rayserve Pack',
       description: 'Scalable model serving with Ray Serve through the RayService CRD, with optional routing, TLS, and OIDC via the nebari-operator.',
       // Shared Nebari identity (brand colors, fonts, logo, favicon, footer, and
       // GitHub social link) comes from the @nebari/starlight theme plugin. On the

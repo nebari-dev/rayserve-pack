@@ -1,6 +1,6 @@
-# Nebari Ray Serve Pack Documentation
+# Nebari Rayserve Pack Documentation
 
-This directory contains the [Astro](https://astro.build) + [Starlight](https://starlight.astro.build) site for the Nebari Ray Serve Pack.
+This directory contains the [Astro](https://astro.build) + [Starlight](https://starlight.astro.build) site for the Nebari Rayserve Pack.
 
 ## Prerequisites
 
