@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Documentation for the Nebari Ray Serve Pack - deploy Ray Serve on Nebari for scalable model serving, with NebariApp routing, TLS, and gateway authentication.
+description: "Scalable model serving with Ray Serve through the RayService CRD, with optional routing, TLS, and OIDC via the nebari-operator."
 ---
 
 The Nebari Ray Serve Pack deploys [Ray Serve](https://docs.ray.io/en/latest/serve/index.html)
