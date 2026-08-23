@@ -234,6 +234,11 @@ image:
   repository: rayproject/ray
   tag: 2.43.0
 
+# Ray version advertised to KubeRay (spec.rayClusterConfig.rayVersion). Falls
+# back to image.tag, which is only correct for stock rayproject/ray images —
+# set this explicitly when image.tag is not a Ray version (custom images).
+rayVersion: ""
+
 # =============================================================================
 # Ray Head
 # =============================================================================

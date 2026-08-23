@@ -18,7 +18,7 @@ spec:
     applications: {{ .Values.serveApplications | default list | toJson }}
 
   rayClusterConfig:
-    rayVersion: {{ .Values.image.tag | quote }}
+    rayVersion: {{ .Values.rayVersion | default .Values.image.tag | quote }}
     headGroupSpec:
       rayStartParams:
         dashboard-host: "0.0.0.0"
