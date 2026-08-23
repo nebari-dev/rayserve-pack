@@ -36,6 +36,10 @@ nebariapp:
       - openid
       - profile
       - email
+    # Restrict gateway access to these Keycloak groups (empty = any
+    # authenticated user). The dashboard's job API is remote code execution —
+    # gate it.
+    groups: []
 
   gateway: public
 

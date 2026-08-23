@@ -24,6 +24,11 @@ spec:
     redirectURI: {{ .Values.nebariapp.auth.redirectURI }}
     scopes:
       {{- toYaml .Values.nebariapp.auth.scopes | nindent 6 }}
+    {{- with .Values.nebariapp.auth.groups }}
+    # Keycloak groups allowed through the gateway (and shown the landing card).
+    groups:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
   {{- end }}
   gateway: {{ .Values.nebariapp.gateway }}
@@ -55,6 +60,11 @@ spec:
     redirectURI: {{ .Values.nebariapp.auth.redirectURI }}
     scopes:
       {{- toYaml .Values.nebariapp.auth.scopes | nindent 6 }}
+    {{- with .Values.nebariapp.auth.groups }}
+    # Keycloak groups allowed through the gateway (and shown the landing card).
+    groups:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
   {{- end }}
   {{- with .Values.nebariapp.dashboard.landingPage }}
