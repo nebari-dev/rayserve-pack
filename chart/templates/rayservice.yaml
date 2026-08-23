@@ -48,9 +48,10 @@ spec:
           initContainers:
             {{- . | nindent 12 }}
           {{- end }}
-          {{- with (include "nebari-rayserve.orgCABundle.volumes" .) }}
+          {{- $headVolumes := concat (.Values.head.extraVolumes | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumes" .)) }}
+          {{- with $headVolumes }}
           volumes:
-            {{- . | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with (include "nebari-rayserve.tolerations" .Values.head) }}
           tolerations:
@@ -68,9 +69,10 @@ spec:
               env:
                 {{- toYaml . | nindent 16 }}
               {{- end }}
-              {{- with (include "nebari-rayserve.orgCABundle.volumeMounts" .) }}
+              {{- $headMounts := concat (.Values.head.extraVolumeMounts | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumeMounts" .)) }}
+              {{- with $headMounts }}
               volumeMounts:
-                {{- . | nindent 16 }}
+                {{- toYaml . | nindent 16 }}
               {{- end }}
               resources:
                 {{- toYaml .Values.head.resources | nindent 16 }}
@@ -123,9 +125,10 @@ spec:
             initContainers:
               {{- . | nindent 14 }}
             {{- end }}
-            {{- with (include "nebari-rayserve.orgCABundle.volumes" .) }}
+            {{- $workerVolumes := concat (.Values.worker.extraVolumes | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumes" .)) }}
+            {{- with $workerVolumes }}
             volumes:
-              {{- . | nindent 14 }}
+              {{- toYaml . | nindent 14 }}
             {{- end }}
             {{- with (include "nebari-rayserve.tolerations" .Values.worker) }}
             tolerations:
@@ -143,9 +146,10 @@ spec:
                 env:
                   {{- toYaml . | nindent 18 }}
                 {{- end }}
-                {{- with (include "nebari-rayserve.orgCABundle.volumeMounts" .) }}
+                {{- $workerMounts := concat (.Values.worker.extraVolumeMounts | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumeMounts" .)) }}
+                {{- with $workerMounts }}
                 volumeMounts:
-                  {{- . | nindent 18 }}
+                  {{- toYaml . | nindent 18 }}
                 {{- end }}
                 resources:
                   {{- toYaml .Values.worker.resources | nindent 18 }}

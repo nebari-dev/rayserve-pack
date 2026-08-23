@@ -270,6 +270,12 @@ head:
   readinessProbe: {}
   livenessProbe: {}
 
+  # Extra pod volumes / container volumeMounts appended after any
+  # orgCABundle-generated entries (e.g. a shared artifact directory that
+  # workloads write and an external consumer reads).
+  extraVolumes: []
+  extraVolumeMounts: []
+
 # =============================================================================
 # Ray Workers
 # =============================================================================
@@ -337,6 +343,12 @@ worker:
     periodSeconds: 5
     timeoutSeconds: 2
     failureThreshold: 120
+
+  # Extra pod volumes / container volumeMounts appended after any
+  # orgCABundle-generated entries (e.g. a shared artifact directory that
+  # workloads write and an external consumer reads).
+  extraVolumes: []
+  extraVolumeMounts: []
 
 # =============================================================================
 # Overrides
