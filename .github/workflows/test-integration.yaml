@@ -114,6 +114,11 @@ jobs:
           helm install kuberay-operator chart/charts/kuberay-operator-*.tgz \
             --wait --timeout 3m
 
+      # networkPolicy stays OFF here: recent kind versions enforce
+      # NetworkPolicy via kube-network-policies, and this job's port-forward
+      # health checks don't match any allow rule. Enforcement coverage lives
+      # in test.yaml's netpol-enforced job; rendering with NebariApp+netpol
+      # combined is covered by the lint permutations.
       - name: Deploy Ray Serve with NebariApp
         run: |
           helm install rayserve chart/ \
@@ -144,10 +149,10 @@ jobs:
           kubectl wait --for=condition=ready pod -l ray.io/node-type=head --timeout=300s
 
       - name: Verify NebariApp (serve)
-        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve --timeout=300s
+        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-pack --timeout=300s
 
       - name: Verify NebariApp (dashboard)
-        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-dashboard --timeout=300s
+        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-pack-dashboard --timeout=300s
 
       - name: Verify HTTPRoutes created
         run: |
@@ -161,7 +166,7 @@ jobs:
 
       - name: Health check Ray Dashboard via port-forward
         run: |
-          kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 &
+          kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 &
           sleep 5
           curl -sf http://localhost:8265/api/version
           kill %1
@@ -169,6 +174,11 @@ jobs:
       # ============================================================
       # Test: Upgrade to enable auth
       # ============================================================
+      # Must repeat the install step's resource/replica overrides: omitting
+      # them reverts the RayService to chart-default sizing, which triggers a
+      # zero-downtime cluster replacement (old + new clusters running at
+      # once) that doesn't reliably fit the runner and times out --wait. The
+      # auth flip should not touch the Ray cluster at all.
       - name: Upgrade with auth enabled
         run: |
           helm upgrade rayserve chart/ \
@@ -179,6 +189,11 @@ jobs:
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=ray-dashboard.nebari.local \
             --set nebariapp.auth.enabled=true \
+            --set head.resources.requests.cpu=500m \
+            --set head.resources.requests.memory=512Mi \
+            --set head.resources.limits.cpu=1 \
+            --set head.resources.limits.memory=1Gi \
+            --set worker.replicas=0 \
             --wait --timeout 5m
 
       - name: Verify SecurityPolicies created

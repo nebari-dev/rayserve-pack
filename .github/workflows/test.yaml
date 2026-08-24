@@ -29,6 +29,11 @@ jobs:
           helm install kuberay-operator chart/charts/kuberay-operator-*.tgz \
             --wait --timeout 3m
 
+      # Baseline job: networkPolicy stays OFF here so the port-forward health
+      # check exercises the unrestricted path (recent kind versions enforce
+      # NetworkPolicy via kube-network-policies, which would block traffic
+      # that doesn't match a rule). NetworkPolicy coverage lives in the
+      # netpol-enforced job below.
       - name: Install chart (standalone, no NebariApp)
         run: |
           helm install rayserve chart/ \
@@ -78,7 +83,7 @@ jobs:
 
       - name: Health check Ray Dashboard
         run: |
-          kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 &
+          kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 &
           sleep 5
           curl -sf http://localhost:8265/api/version
           kill %1
@@ -104,4 +109,126 @@ jobs:
           kubectl logs -l ray.io/node-type=head --tail=50 || true
           echo ""
           echo "=== Events ==="
+          kubectl get events --sort-by=.lastTimestamp | tail -30 || true
+
+  # Proves the NetworkPolicies are actually ENFORCED, not just applied:
+  # kindnet ignores NetworkPolicy, so this job swaps in Calico. RayService
+  # reaching Ready also structurally proves the kuberay-operator ingress rule
+  # (operator -> head:8265) is correct — with a wrong rule the RayService
+  # never reconciles.
+  netpol-enforced:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create kind cluster (no default CNI)
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: rayserve-netpol
+          config: .github/kind-calico.yaml
+
+      - name: Install Calico
+        run: |
+          kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/tigera-operator.yaml
+          # custom-resources.yaml needs the operator's CRDs registered first —
+          # applying immediately races CRD establishment and fails with
+          # "no matches for kind Installation".
+          kubectl wait --for condition=established crd/installations.operator.tigera.io --timeout=120s
+          kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.2/manifests/custom-resources.yaml
+          echo "Waiting for Calico..."
+          for i in $(seq 1 60); do
+            if kubectl get tigerastatus calico -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q True; then
+              echo "Calico available"; break
+            fi
+            echo "  attempt $i/60..."; sleep 5
+          done
+          kubectl wait --for=condition=ready node --all --timeout=180s
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Update chart dependencies
+        run: helm dependency update chart/
+
+      - name: Install KubeRay operator
+        run: |
+          helm install kuberay-operator chart/charts/kuberay-operator-*.tgz \
+            --wait --timeout 3m
+
+      - name: Install chart (NetworkPolicy enabled)
+        run: |
+          helm install rayserve chart/ \
+            --set kuberay-operator.enabled=false \
+            --set nebariapp.enabled=false \
+            --set networkPolicy.enabled=true \
+            --set networkPolicy.gatewayNamespaces[0]=fake-gateway \
+            --set networkPolicy.allowedClients[0].namespace=client-ns \
+            --set networkPolicy.allowedClients[0].ports[0]=8265 \
+            --set head.resources.requests.cpu=500m \
+            --set head.resources.requests.memory=512Mi \
+            --set head.resources.limits.cpu=1 \
+            --set head.resources.limits.memory=1Gi \
+            --set worker.replicas=1 \
+            --set worker.resources.requests.cpu=250m \
+            --set worker.resources.requests.memory=512Mi \
+            --set worker.resources.limits.cpu=500m \
+            --set worker.resources.limits.memory=1Gi \
+            --timeout 5m
+
+      - name: Wait for Ray pods (operator rule proven if Ready)
+        run: |
+          for i in $(seq 1 60); do
+            if kubectl get pod -l ray.io/node-type=head -o name 2>/dev/null | grep -q pod; then
+              break
+            fi
+            echo "  attempt $i/60..."; sleep 5
+          done
+          kubectl wait --for=condition=ready pod -l ray.io/node-type=head --timeout=300s
+          kubectl wait --for=condition=ready pod -l ray.io/node-type=worker --timeout=300s
+
+      - name: Assert policies exist
+        run: |
+          count=$(kubectl get networkpolicy -o name | wc -l)
+          test "$count" -eq 2 || { echo "expected 2 NetworkPolicies, got $count"; exit 1; }
+
+      - name: Denied — unlisted pod cannot reach the dashboard
+        run: |
+          set +e
+          kubectl run deny-test --restart=Never --image=curlimages/curl -- \
+            curl -m 5 -sf http://rayserve-nebari-rayserve-pack-head-svc:8265/api/version
+          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/deny-test --timeout=60s
+          if [ $? -eq 0 ]; then
+            echo "ERROR: unlisted pod reached the Ray dashboard — policy not enforced"
+            exit 1
+          fi
+          echo "Denied as expected"
+
+      # Retried with fresh pods: Calico's dataplane can lag a few seconds
+      # behind a newly created namespace before the namespaceSelector match
+      # takes effect, so a single one-shot curl is flaky.
+      - name: Allowed — allow-listed namespace reaches the dashboard
+        run: |
+          kubectl create namespace client-ns
+          for i in $(seq 1 6); do
+            if kubectl run allow-test-$i -n client-ns --restart=Never --rm --attach \
+                 --image=curlimages/curl -- \
+                 curl -m 10 -sf http://rayserve-nebari-rayserve-pack-head-svc.default:8265/api/version; then
+              echo "Allowed as expected (attempt $i)"
+              exit 0
+            fi
+            echo "attempt $i failed, retrying..."
+            sleep 10
+          done
+          echo "ERROR: allow-listed namespace never reached the Ray dashboard"
+          exit 1
+
+      - name: Debug info on failure
+        if: failure()
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl get networkpolicy -o yaml || true
+          kubectl describe pod deny-test || true
+          kubectl -n client-ns describe pod allow-test || true
+          kubectl logs -l ray.io/node-type=head --tail=50 || true
           kubectl get events --sort-by=.lastTimestamp | tail -30 || true

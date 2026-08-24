@@ -122,7 +122,7 @@ up: cluster
 		--set nebariapp.dashboard.enabled=true \
 		--set nebariapp.dashboard.hostname=$(DASH_HOSTNAME) \
 		--wait --timeout 5m
-	kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve --timeout=180s
+	kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-pack --timeout=180s
 	CLUSTER_NAME=$(CLUSTER_NAME) $(OPERATOR_REPO)/dev/scripts/networking/update-hosts.sh
 	@echo ""
 	@echo "Ray Serve deployed with NebariApp."
@@ -144,8 +144,8 @@ up-standalone:
 	@echo "Ray Serve deployed (standalone, no NebariApp)."
 	@echo ""
 	@echo "Access via port-forward:"
-	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-serve-svc 8000:8000"
-	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265"
+	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-pack-serve-svc 8000:8000"
+	@echo "  kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265"
 
 # --------------------------------------------------------------------------
 # update-hosts - update /etc/hosts with all NebariApp hostnames

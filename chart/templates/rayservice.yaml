@@ -18,22 +18,40 @@ spec:
     applications: {{ .Values.serveApplications | default list | toJson }}
 
   rayClusterConfig:
-    rayVersion: {{ .Values.image.tag | quote }}
+    rayVersion: {{ .Values.rayVersion | default .Values.image.tag | quote }}
     headGroupSpec:
       rayStartParams:
         dashboard-host: "0.0.0.0"
       template:
         spec:
+          serviceAccountName: {{ include "nebari-rayserve.serviceAccountName" . }}
+          automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+          {{- with .Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.head.runtimeClassName }}
           runtimeClassName: {{ . }}
+          {{- end }}
+          {{- with .Values.head.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.head.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.head.priorityClassName }}
+          priorityClassName: {{ . }}
           {{- end }}
           {{- with (include "nebari-rayserve.orgCABundle.initContainers" .) }}
           initContainers:
             {{- . | nindent 12 }}
           {{- end }}
-          {{- with (include "nebari-rayserve.orgCABundle.volumes" .) }}
+          {{- $headVolumes := concat (.Values.head.extraVolumes | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumes" .)) }}
+          {{- with $headVolumes }}
           volumes:
-            {{- . | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with (include "nebari-rayserve.tolerations" .Values.head) }}
           tolerations:
@@ -42,14 +60,19 @@ spec:
           containers:
             - name: ray-head
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              {{- with .Values.containerSecurityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
               {{- $headEnv := concat (.Values.head.containerEnv | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.env" .)) }}
               {{- with $headEnv }}
               env:
                 {{- toYaml . | nindent 16 }}
               {{- end }}
-              {{- with (include "nebari-rayserve.orgCABundle.volumeMounts" .) }}
+              {{- $headMounts := concat (.Values.head.extraVolumeMounts | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumeMounts" .)) }}
+              {{- with $headMounts }}
               volumeMounts:
-                {{- . | nindent 16 }}
+                {{- toYaml . | nindent 16 }}
               {{- end }}
               resources:
                 {{- toYaml .Values.head.resources | nindent 16 }}
@@ -78,16 +101,34 @@ spec:
         rayStartParams: {}
         template:
           spec:
+            serviceAccountName: {{ include "nebari-rayserve.serviceAccountName" . }}
+            automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+            {{- with .Values.podSecurityContext }}
+            securityContext:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
             {{- with .Values.worker.runtimeClassName }}
             runtimeClassName: {{ . }}
+            {{- end }}
+            {{- with .Values.worker.nodeSelector }}
+            nodeSelector:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.worker.affinity }}
+            affinity:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with .Values.worker.priorityClassName }}
+            priorityClassName: {{ . }}
             {{- end }}
             {{- with (include "nebari-rayserve.orgCABundle.initContainers" .) }}
             initContainers:
               {{- . | nindent 14 }}
             {{- end }}
-            {{- with (include "nebari-rayserve.orgCABundle.volumes" .) }}
+            {{- $workerVolumes := concat (.Values.worker.extraVolumes | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumes" .)) }}
+            {{- with $workerVolumes }}
             volumes:
-              {{- . | nindent 14 }}
+              {{- toYaml . | nindent 14 }}
             {{- end }}
             {{- with (include "nebari-rayserve.tolerations" .Values.worker) }}
             tolerations:
@@ -96,14 +137,19 @@ spec:
             containers:
               - name: ray-worker
                 image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+                {{- with .Values.containerSecurityContext }}
+                securityContext:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
                 {{- $workerEnv := concat (.Values.worker.containerEnv | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.env" .)) }}
                 {{- with $workerEnv }}
                 env:
                   {{- toYaml . | nindent 18 }}
                 {{- end }}
-                {{- with (include "nebari-rayserve.orgCABundle.volumeMounts" .) }}
+                {{- $workerMounts := concat (.Values.worker.extraVolumeMounts | default list) (fromYamlArray (include "nebari-rayserve.orgCABundle.volumeMounts" .)) }}
+                {{- with $workerMounts }}
                 volumeMounts:
-                  {{- . | nindent 18 }}
+                  {{- toYaml . | nindent 18 }}
                 {{- end }}
                 resources:
                   {{- toYaml .Values.worker.resources | nindent 18 }}

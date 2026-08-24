@@ -1,0 +1,97 @@
+{{- if .Values.networkPolicy.enabled }}
+# Ray has no native authentication on the client port (10001), GCS (6379),
+# or dashboard/job API (8265): anything that can reach those ports can run
+# arbitrary code on the cluster. These policies make NetworkPolicy the
+# authorization boundary for in-cluster access.
+#
+# Selectors deliberately use the KubeRay-injected labels ray.io/is-ray-node /
+# ray.io/node-type and NOT ray.io/cluster — RayService generates RayCluster
+# names with a random suffix, and during zero-downtime upgrades the old and
+# new clusters coexist; these selectors cover both.
+#
+# Both policies are Ingress-only. Egress is deliberately unrestricted: Ray
+# workloads legitimately fetch models, datasets, and packages (that is why
+# orgCABundle exists). There is also no namespace-wide default-deny — the
+# policies select only Ray pods, so the colocated kuberay-operator is
+# untouched.
+#
+# Policy 1 — all Ray pods: intra-cluster traffic + operator control plane.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "nebari-rayserve.fullname" . }}-ray-cluster
+  labels:
+    {{- include "nebari-rayserve.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      ray.io/is-ray-node: "yes"
+  policyTypes:
+    - Ingress
+  ingress:
+    # Ray inter-node traffic (object manager, node manager, GCS, metrics)
+    # uses many ephemeral ports — allow-all between Ray pods rather than
+    # port-enumerated.
+    - from:
+        - podSelector:
+            matchLabels:
+              ray.io/is-ray-node: "yes"
+    # kuberay-operator (same namespace): dashboard API 8265 (serve config
+    # submission + RayService health checks), dashboard agent 52365,
+    # serve 8000. Without this the RayService never reconciles to Ready.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kuberay-operator
+      ports:
+        - port: 8265
+        - port: 52365
+        - port: 8000
+---
+# Policy 2 — head pod only: gateway + allow-listed cross-namespace clients.
+# Unions with policy 1 (the head is also is-ray-node), so the head accepts
+# intra-cluster + operator + gateway + clients; workers accept only
+# intra-cluster + operator.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "nebari-rayserve.fullname" . }}-ray-head
+  labels:
+    {{- include "nebari-rayserve.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      ray.io/node-type: head
+  policyTypes:
+    - Ingress
+  ingress:
+    # Envoy Gateway → dashboard (8265) and serve (8000) via the stable
+    # Services. Namespaces are matched by the kubernetes.io/metadata.name
+    # auto-label; verify the actual gateway namespace per cluster.
+    - from:
+        {{- range .Values.networkPolicy.gatewayNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - port: 8265
+        - port: 8000
+    {{- range .Values.networkPolicy.allowedClients }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "networkPolicy.allowedClients entries require a namespace" .namespace }}
+          {{- with .podSelector }}
+          podSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      ports:
+        {{- range (.ports | default (list 10001 8000 8265)) }}
+        - port: {{ . }}
+        {{- end }}
+    {{- end }}
+    {{- with .Values.networkPolicy.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

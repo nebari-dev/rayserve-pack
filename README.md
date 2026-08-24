@@ -40,10 +40,10 @@ Access via port-forward:
 
 ```bash
 # Ray Dashboard
-kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 -n rayserve
 
 # Ray Serve endpoint
-kubectl port-forward svc/rayserve-nebari-rayserve-serve-svc 8000:8000 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-serve-svc 8000:8000 -n rayserve
 ```
 
 ### On a Nebari cluster (via ArgoCD)
@@ -123,7 +123,7 @@ spec:
 - `managedNamespaceMetadata` with `nebari.dev/managed: "true"` is required for the nebari-operator to manage NebariApp resources
 - `redirectURI` must be `/oauth2/callback` (Envoy Gateway rejects `/`)
 - Set `serve.enabled: false` to keep the serve endpoint internal-only (recommended — notebooks access it via cluster DNS)
-- The `/spec/rayClusterConfig` ignore rule combined with `RespectIgnoreDifferences=true` makes ArgoCD stop managing everything under `rayClusterConfig`. If you enable [`orgCABundle`](#organization-ca-bundle-injection), the CA injection lives under that path and will **silently not apply** — see the ArgoCD footgun warning in that section before turning it on.
+- The `/spec/rayClusterConfig` ignore rule combined with `RespectIgnoreDifferences=true` makes ArgoCD stop managing everything under `rayClusterConfig`. If you enable [`orgCABundle`](#organization-ca-bundle-injection), the CA injection lives under that path and will **silently not apply** — see the ArgoCD footgun warning in that section before turning it on. The same applies to every pod-spec hardening field this chart injects (`securityContext`, `serviceAccountName`, `automountServiceAccountToken`, `nodeSelector`, `affinity`, `priorityClassName`) — see [Security](#security).
 
 ## Connecting from Jupyter
 
@@ -135,7 +135,7 @@ from ray import serve
 import requests
 
 # Connect to the Ray cluster
-ray.init("ray://rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001")
+ray.init("ray://rayserve-nebari-rayserve-pack-head-svc.rayserve.svc.cluster.local:10001")
 
 # Deploy a model
 @serve.deployment
@@ -146,7 +146,7 @@ class Hello:
 serve.run(Hello.bind(), name="hello", route_prefix="/hello")
 
 # Run inference
-resp = requests.get("http://rayserve-nebari-rayserve-serve-svc.rayserve.svc.cluster.local:8000/hello")
+resp = requests.get("http://rayserve-nebari-rayserve-pack-serve-svc.rayserve.svc.cluster.local:8000/hello")
 print(resp.text)
 # Hello from Ray Serve!
 ```
@@ -187,6 +187,66 @@ serveApplications:
 
 The RayService controller handles deployment, health monitoring, and zero-downtime upgrades automatically.
 
+## Security
+
+Ray has **no native authentication** on the client port (10001), GCS (6379), or dashboard/job API (8265): any pod that can reach those ports can execute arbitrary code on the cluster with the cluster's privileges. Keycloak OIDC (via NebariApp) only protects the *external* hostnames — in-cluster traffic bypasses the gateway entirely. This chart therefore treats **NetworkPolicy as the in-cluster authorization boundary**, plus pod hardening and namespace resource isolation.
+
+### NetworkPolicy (opt-in)
+
+```yaml
+networkPolicy:
+  enabled: true
+  # MUST match your cluster's Envoy Gateway data-plane namespace(s) —
+  # verify with: kubectl get pods -A -o wide | grep -i envoy
+  gatewayNamespaces:
+    - envoy-gateway-system
+  allowedClients:
+    # checkmaite api — its ray job backend uses ray.init(ray://...:10001) only
+    - namespace: checkmaite
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/component: api
+      ports: [10001]
+    # Jupyter notebooks (data-science-pack): interactive ray client, serve
+    # endpoint, and the job-submission SDK
+    - namespace: jupyter
+      ports: [10001, 8000, 8265]
+```
+
+What gets rendered (two Ingress-only policies, selecting only Ray pods):
+
+| Traffic | Allowed by |
+|---------|-----------|
+| Ray pod ↔ Ray pod (all ports — inter-node traffic uses ephemeral ports) | `-ray-cluster` policy |
+| kuberay-operator → 8265/52365/8000 (required for RayService reconciliation) | `-ray-cluster` policy |
+| Gateway namespaces → head 8265 (dashboard) + 8000 (serve) | `-ray-head` policy |
+| `allowedClients` entries → head, their listed ports (default `[10001, 8000, 8265]`) | `-ray-head` policy |
+| Everything else → any Ray pod | **denied** |
+
+Egress is deliberately **not** restricted — Ray workloads legitimately fetch models, datasets, and packages (the reason [`orgCABundle`](#organization-ca-bundle-injection) exists). Notes:
+
+- Your CNI must enforce NetworkPolicy (Calico, Cilium, …). kind's default kindnet silently enforces nothing.
+- `podSelector` inside an `allowedClients` entry matches labels on pods in *that* namespace — with one release per namespace, `app.kubernetes.io/component: api` is unambiguous for checkmaite.
+- Extra ingress (e.g. Prometheus scraping) goes in `networkPolicy.extraIngress` as raw rules.
+- NetworkPolicy restricts *who can connect*; traffic is still plaintext and any allowed client is fully trusted by Ray. In-transit mTLS (`RAY_USE_TLS`) is a tracked follow-up — see [#29](https://github.com/nebari-dev/rayserve-pack/issues/29).
+
+### Pod hardening (on by default)
+
+`podSecurityContext` / `containerSecurityContext` default to non-root uid 1000 / gid 100, seccomp `RuntimeDefault`, no privilege escalation, all capabilities dropped — exactly what the stock `rayproject/ray` image already does at runtime, so default installs behave identically, but the kubelet now enforces it and the pods satisfy the **restricted** [Pod Security Standard](https://kubernetes.io/docs/concepts/security/pod-security-standards/) (labeling the namespace, e.g. `pod-security.kubernetes.io/enforce: restricted`, is up to your GitOps layer; Ray's `/dev/shm` Memory-medium emptyDir is restricted-compatible). Running a custom image that needs root? Set `podSecurityContext: {}` and `containerSecurityContext: {}`.
+
+Ray pods also get a dedicated ServiceAccount with `automountServiceAccountToken: false` — Ray never talks to the Kubernetes API, so a compromised job finds no K8s credentials.
+
+### Resource isolation (opt-in)
+
+Deploy one RayService per team namespace and cap it: `resourceQuota.enabled=true` + `limitRange.enabled=true`. **Size the quota for two full clusters** — RayService zero-downtime upgrades run old + new RayClusters simultaneously; a tight quota wedges upgrades. Pin to dedicated node pools with the new `head.nodeSelector` / `worker.nodeSelector` / `affinity` / `priorityClassName` values (GPU tolerations are still auto-injected).
+
+> **⚠️ ArgoCD footgun (again):** every pod-spec field above (`securityContext`, `serviceAccountName`, `automountServiceAccountToken`, `nodeSelector`, `affinity`, `priorityClassName`) lives under `/spec/rayClusterConfig`, the exact path the example ArgoCD `Application` tells ArgoCD to stop managing. On such clusters these fields **silently never apply** while ArgoCD reports Synced/Healthy. The top-level NetworkPolicy / ServiceAccount / ResourceQuota / LimitRange resources are unaffected. Narrow the ignore rule as described in the [orgCABundle warning](#organization-ca-bundle-injection), then verify against the running pod, not the sync status:
+>
+> ```bash
+> kubectl get pod -n rayserve -l ray.io/node-type=head \
+>   -o jsonpath='{.items[0].spec.securityContext}'
+> ```
+
 ## Chart Configuration
 
 Key values in `chart/values.yaml`:
@@ -219,6 +279,23 @@ Key values in `chart/values.yaml`:
 | `worker.resources.requests.cpu` | `1` | Worker CPU request |
 | `worker.resources.requests.memory` | `2Gi` | Worker memory request |
 | `worker.runtimeClassName` | - | Runtime class for worker pods (e.g., `nvidia` for GPU) |
+| `head.nodeSelector` / `worker.nodeSelector` | `{}` | Pin pods to a dedicated node pool |
+| `head.affinity` / `worker.affinity` | `{}` | Pod affinity/anti-affinity |
+| `head.priorityClassName` / `worker.priorityClassName` | `""` | PriorityClass for the pods |
+
+### Security
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `serviceAccount.create` | `true` | Dedicated ServiceAccount for Ray pods |
+| `serviceAccount.automount` | `false` | Mount the SA token (Ray doesn't use the K8s API) |
+| `podSecurityContext` | non-root 1000:100, seccomp | Pod securityContext for head + worker (set `{}` for root images) |
+| `containerSecurityContext` | no privesc, drop ALL | Container securityContext for head + worker |
+| `networkPolicy.enabled` | `false` | Restrict ingress to Ray pods (see [Security](#security)) |
+| `networkPolicy.gatewayNamespaces` | `[envoy-gateway-system]` | Envoy Gateway namespace(s) — **verify per cluster** |
+| `networkPolicy.allowedClients` | `[]` | Cross-namespace clients allowed to reach the head |
+| `resourceQuota.enabled` | `false` | Namespace ResourceQuota (size for 2× a cluster) |
+| `limitRange.enabled` | `false` | Namespace LimitRange defaults |
 
 ### Serve Applications
 
@@ -362,7 +439,7 @@ The NebariApp may be pointing at a service that doesn't exist. Check the actual 
 kubectl get svc -n rayserve
 ```
 
-The stable services are `<release>-nebari-rayserve-head-svc` and `<release>-nebari-rayserve-serve-svc`.
+The stable services are `<release>-nebari-rayserve-pack-head-svc` and `<release>-nebari-rayserve-pack-serve-svc`.
 
 ### Version mismatch connecting from Jupyter
 

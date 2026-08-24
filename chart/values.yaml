@@ -36,6 +36,10 @@ nebariapp:
       - openid
       - profile
       - email
+    # Restrict gateway access to these Keycloak groups (empty = any
+    # authenticated user). The dashboard's job API is remote code execution —
+    # gate it.
+    groups: []
 
   gateway: public
 
@@ -123,6 +127,109 @@ orgCABundle:
   initImage: "alpine:3.20"
 
 # =============================================================================
+# Security
+# =============================================================================
+# Dedicated ServiceAccount for the Ray head and worker pods. Ray itself never
+# talks to the Kubernetes API, so the token is not mounted (automount: false)
+# — a compromised Ray job gets no K8s credentials. Set automount: true only
+# if your serve applications genuinely need the API.
+serviceAccount:
+  create: true
+  # Defaults to the chart fullname.
+  name: ""
+  automount: false
+
+# Pod-level securityContext applied to BOTH head and worker pod specs.
+# The defaults assert what the stock rayproject/ray image already does at
+# runtime (user `ray`, uid 1000, gid 100), so default installs behave
+# identically — but the kubelet now enforces it, and the pods satisfy the
+# "restricted" Pod Security Standard. fsGroup keeps the orgCABundle shared
+# emptyDir writable by the non-root initContainer.
+# Running a custom image that needs root? Override with podSecurityContext: {}.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 100
+  fsGroup: 100
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level securityContext for the ray-head and ray-worker containers.
+# readOnlyRootFilesystem is deliberately NOT set: Ray writes logs, object
+# spilling, and runtime envs under /tmp/ray.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+# NetworkPolicy allow-listing for the Ray pods. Ray has NO native
+# authentication on the client port (10001), GCS (6379), or dashboard/job
+# API (8265) — any pod that can reach them can execute arbitrary code on the
+# cluster. With enabled: true, ingress to Ray pods is restricted to:
+#   - other Ray pods in this namespace (inter-node traffic uses many
+#     ephemeral ports, so this is allow-all between Ray pods)
+#   - the kuberay-operator (dashboard API 8265, dashboard agent 52365,
+#     serve 8000 — required or RayService never reconciles)
+#   - the Envoy Gateway namespace(s) below → head 8265 + 8000 (the NebariApp
+#     path for dashboard/serve hostnames)
+#   - explicitly allow-listed cross-namespace clients (see allowedClients)
+# Egress is deliberately NOT restricted: Ray workloads legitimately fetch
+# models, datasets, and packages (that's why orgCABundle exists); the threat
+# model here is inbound access to unauthenticated ports.
+# NOTE: your CNI must enforce NetworkPolicy (Calico, Cilium, ...). kind's
+# default kindnet does NOT.
+networkPolicy:
+  enabled: false
+  # Namespace(s) hosting the Envoy Gateway data plane, matched via the
+  # kubernetes.io/metadata.name auto-label (k8s >= 1.21). MUST be verified
+  # per cluster:  kubectl get pods -A -o wide | grep -i envoy
+  gatewayNamespaces:
+    - envoy-gateway-system
+  # Cross-namespace clients allowed to reach the Ray head. Each entry:
+  #   namespace: <name>          (required — matched via metadata.name label)
+  #   podSelector: {...}         (optional — restricts to matching pods)
+  #   ports: [10001, ...]        (optional — defaults to [10001, 8000, 8265])
+  # Examples:
+  #   - namespace: checkmaite        # checkmaite api: Ray client only
+  #     podSelector:
+  #       matchLabels:
+  #         app.kubernetes.io/component: api
+  #     ports: [10001]
+  #   - namespace: jupyter           # data-science-pack notebooks
+  #     ports: [10001, 8000, 8265]
+  allowedClients: []
+  # Extra raw ingress rules appended verbatim to the head policy (e.g.
+  # Prometheus scraping metrics from a monitoring namespace).
+  extraIngress: []
+
+# Opt-in namespace ResourceQuota. Deploy one RayService per team namespace
+# and cap the blast radius here.
+# WARNING: size for TWO full clusters — RayService zero-downtime upgrades run
+# the old and new RayCluster simultaneously; a tight quota wedges upgrades.
+resourceQuota:
+  enabled: false
+  hard:
+    requests.cpu: "16"
+    requests.memory: 64Gi
+    limits.cpu: "32"
+    limits.memory: 128Gi
+    # requests.nvidia.com/gpu: "4"
+
+# Opt-in namespace LimitRange — default requests/limits for containers that
+# don't set their own (head/worker and the kuberay-operator all set explicit
+# resources, so this only catches ad-hoc pods in the namespace).
+limitRange:
+  enabled: false
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 250m
+        memory: 512Mi
+      default:
+        cpu: "1"
+        memory: 2Gi
+
+# =============================================================================
 # Ray Image
 # =============================================================================
 # Used for both head and worker nodes. For production, build a custom image
@@ -131,11 +238,20 @@ image:
   repository: rayproject/ray
   tag: 2.43.0
 
+# Ray version advertised to KubeRay (spec.rayClusterConfig.rayVersion). Falls
+# back to image.tag, which is only correct for stock rayproject/ray images —
+# set this explicitly when image.tag is not a Ray version (custom images).
+rayVersion: ""
+
 # =============================================================================
 # Ray Head
 # =============================================================================
 head:
   # runtimeClassName: nvidia  # Set for GPU-enabled head nodes
+  # Pin the head to a dedicated node pool for scheduling isolation.
+  nodeSelector: {}
+  affinity: {}
+  priorityClassName: ""
   containerEnv: []
   resources:
     limits:
@@ -158,6 +274,12 @@ head:
   readinessProbe: {}
   livenessProbe: {}
 
+  # Extra pod volumes / container volumeMounts appended after any
+  # orgCABundle-generated entries (e.g. a shared artifact directory that
+  # workloads write and an external consumer reads).
+  extraVolumes: []
+  extraVolumeMounts: []
+
 # =============================================================================
 # Ray Workers
 # =============================================================================
@@ -166,6 +288,10 @@ worker:
   minReplicas: 1
   maxReplicas: 1
   # runtimeClassName: nvidia  # Set for GPU-enabled worker nodes
+  # Pin workers to a dedicated node pool for scheduling isolation.
+  nodeSelector: {}
+  affinity: {}
+  priorityClassName: ""
   containerEnv: []
   resources:
     limits:
@@ -221,6 +347,12 @@ worker:
     periodSeconds: 5
     timeoutSeconds: 2
     failureThreshold: 120
+
+  # Extra pod volumes / container volumeMounts appended after any
+  # orgCABundle-generated entries (e.g. a shared artifact directory that
+  # workloads write and an external consumer reads).
+  extraVolumes: []
+  extraVolumeMounts: []
 
 # =============================================================================
 # Overrides
