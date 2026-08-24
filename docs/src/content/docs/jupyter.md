@@ -4,7 +4,7 @@ description: Reaching the Ray cluster from an in-cluster notebook — client, ve
 ---
 
 From a notebook in the same cluster — for example via
-[nebari-data-science-pack](https://github.com/nebari-dev/nebari-data-science-pack) — connect
+[nebari-data-science-pack](https://github.com/nebari-dev/data-science-pack) — connect
 straight to the Kubernetes services. No gateway, no auth.
 
 ```python
@@ -12,7 +12,7 @@ import ray
 from ray import serve
 import requests
 
-ray.init("ray://rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001")
+ray.init("ray://rayserve-nebari-rayserve-pack-head-svc.rayserve.svc.cluster.local:10001")
 
 @serve.deployment
 class Hello:
@@ -22,7 +22,7 @@ class Hello:
 serve.run(Hello.bind(), name="hello", route_prefix="/hello")
 
 resp = requests.get(
-    "http://rayserve-nebari-rayserve-serve-svc.rayserve.svc.cluster.local:8000/hello"
+    "http://rayserve-nebari-rayserve-pack-serve-svc.rayserve.svc.cluster.local:8000/hello"
 )
 print(resp.text)
 # Hello from Ray Serve!
@@ -51,7 +51,7 @@ kubectl exec -n rayserve $POD -- ray --version
 kubectl exec -n rayserve $POD -- python --version
 ```
 
-With [Nebi](https://github.com/nebari-dev/nebari-nebi-pack) managing environments:
+With [Nebi](https://github.com/nebari-dev/nebi-pack) managing environments:
 
 ```toml
 [workspace]
@@ -102,8 +102,8 @@ kubectl get svc -n rayserve
 ```
 
 ```
-rayserve-nebari-rayserve-head-svc    ClusterIP   8265/TCP,10001/TCP,6379/TCP
-rayserve-nebari-rayserve-serve-svc   ClusterIP   8000/TCP
+rayserve-nebari-rayserve-pack-head-svc    ClusterIP   8265/TCP,10001/TCP,6379/TCP
+rayserve-nebari-rayserve-pack-serve-svc   ClusterIP   8000/TCP
 ```
 
 Copy them from that output rather than reconstructing them by hand — a `nameOverride` or a
@@ -128,7 +128,7 @@ already running:
 import ray
 from ray import serve
 
-ray.init("ray://rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001")
+ray.init("ray://rayserve-nebari-rayserve-pack-head-svc.rayserve.svc.cluster.local:10001")
 print(serve.status())
 
 handle = serve.get_deployment_handle("MyModel", app_name="my-model")

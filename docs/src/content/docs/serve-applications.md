@@ -18,7 +18,7 @@ Two ways to get a model serving, with different durability.
 ```yaml
 image:
   repository: your-registry/your-ray-image
-  tag: "2.43.0-custom"
+  tag: "2.43.0"
 
 serveApplications:
   - name: my-model
@@ -71,8 +71,13 @@ app = MyModel.bind()
 ```
 
 Base the image on the **same Ray version** the chart deploys — `image.tag`, default
-`2.43.0`. Ray does not tolerate a version skew between the image and `rayVersion`, which
-the chart sets from the same value.
+`2.43.0`. Ray does not tolerate a version skew between the image and `rayVersion`, which the
+chart sets from the same value.
+
+That coupling also constrains how you tag. `image.tag` is copied verbatim into the
+RayService's `rayVersion`, which KubeRay parses as a Ray version, so tag a custom image
+`2.43.0` and distinguish it by repository — not `2.43.0-custom`, which lands in `rayVersion`
+as a version that does not exist.
 
 ## Serve config options
 
@@ -154,7 +159,7 @@ the RayService status rather than the Application's sync state. See
 ## Checking application health
 
 ```bash
-kubectl -n rayserve get rayservice rayserve-nebari-rayserve -o jsonpath='{.status}' | jq
+kubectl -n rayserve get rayservice rayserve-nebari-rayserve-pack -o jsonpath='{.status}' | jq
 ```
 
 Or from the dashboard's Serve tab, which shows per-deployment replica counts and the last

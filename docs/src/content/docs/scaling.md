@@ -34,17 +34,25 @@ worker:
     limits:   { cpu: "8", memory: "32Gi" }
 ```
 
-`minReplicas` and `maxReplicas` both default to `replicas` when unset. Setting them equal
-pins the group; setting `maxReplicas` higher lets the Ray autoscaler grow it in response to
-pending tasks.
+:::caution[Set all three, every time]
+`values.yaml` pins `minReplicas` and `maxReplicas` to `1`. They do **not** follow `replicas`
+— the chart's `default` only applies to a value that is absent, and these never are. Raise
+`replicas` to `3` on its own and you still get one worker, because KubeRay clamps desired
+replicas into the `[minReplicas, maxReplicas]` range.
+:::
 
-The Ray autoscaler works within these bounds and asks Kubernetes for pods — it cannot add
-nodes. On a cluster with a node autoscaler, a `maxReplicas` above what current nodes can
-hold triggers node scale-up; without one, the extra pods stay `Pending`.
+There is no autoscaler behind these bounds. The chart does not set
+`enableInTreeAutoscaling`, so KubeRay runs no Ray autoscaler sidecar and the group size is
+exactly `replicas`. Growing the pool means changing `replicas` and running `helm upgrade`;
+`minReplicas` and `maxReplicas` are clamps, not a range something moves within.
+
+Whether the new pods actually land is a separate question. On a cluster with a node
+autoscaler, asking for more than current nodes can hold triggers node scale-up; without one,
+the extra pods stay `Pending`.
 
 ## GPUs
 
-Three things have to line up.
+Four things have to line up — and the fourth is the one people miss.
 
 **1. Request the GPU resource:**
 
@@ -131,7 +139,7 @@ KubeRay's defaults chain a raylet health check with
 deployed Serve application **and** a local Serve HTTP proxy. On a fresh cluster there are
 no applications — `serveApplications` is empty by default — so the check fails and the
 worker pod sits at `0/1 Ready` forever
-([issue #7](https://github.com/nebari-dev/nebari-rayserve-pack/issues/7)).
+([issue #7](https://github.com/nebari-dev/rayserve-pack/issues/7)).
 
 The chart's defaults check the raylet alone:
 
@@ -198,8 +206,12 @@ head that starts OOM-killing takes the whole cluster with it, so it is worth hea
 
 ## What is not here
 
+- **Ray cluster autoscaling** — the chart does not set `enableInTreeAutoscaling`, so the
+  worker group never grows on its own.
 - **Per-deployment autoscaling** — Ray Serve's own `autoscaling_config` goes in a
-  `serveApplications` deployment entry, not in the chart's values.
+  `serveApplications` deployment entry, not in the chart's values. It scales replicas within
+  the resources the cluster already has, which is all it can do without the cluster
+  autoscaler above.
 - **Multiple worker groups** — the chart renders one `workerGroupSpecs` entry. Heterogeneous
   pools (CPU plus GPU) need a chart change or a second release.
 - **Node autoscaling** — that is your cluster autoscaler's job.

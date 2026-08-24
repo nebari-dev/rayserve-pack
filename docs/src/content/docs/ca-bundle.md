@@ -84,7 +84,7 @@ The result: Argo CD reports a healthy, fully-synced Application, and the running
 receive the CA bundle. TLS calls keep failing with `CERTIFICATE_VERIFY_FAILED` while every
 dashboard says green.
 
-See [issue #17](https://github.com/nebari-dev/nebari-rayserve-pack/issues/17).
+See [issue #17](https://github.com/nebari-dev/rayserve-pack/issues/17).
 :::
 
 The broad ignore exists only to suppress the autoscaler and runtime mutations KubeRay makes

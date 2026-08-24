@@ -7,7 +7,7 @@ description: The failures this pack actually produces, and how to tell them apar
 
 ```bash
 kubectl -n rayserve get rayservice,raycluster,pods,svc
-kubectl -n rayserve describe rayservice rayserve-nebari-rayserve
+kubectl -n rayserve describe rayservice rayserve-nebari-rayserve-pack
 kubectl -n rayserve logs $(kubectl -n rayserve get pod -l ray.io/node-type=head -o name)
 ```
 
@@ -19,7 +19,7 @@ replaced or suppressed.
 KubeRay's default worker probes chain a raylet check with
 `wget http://localhost:8000/-/healthz`, which requires a deployed Serve application and a
 local HTTP proxy. On a cluster with no applications the check never passes and the pod never
-becomes ready ([issue #7](https://github.com/nebari-dev/nebari-rayserve-pack/issues/7)).
+becomes ready ([issue #7](https://github.com/nebari-dev/rayserve-pack/issues/7)).
 
 ```bash
 kubectl -n rayserve get pod -l ray.io/node-type=worker -o jsonpath='{.items[0].spec.containers[0].readinessProbe}' | jq
@@ -36,11 +36,11 @@ The `NebariApp` is pointing at a service that does not exist.
 
 ```bash
 kubectl -n rayserve get svc
-kubectl -n rayserve get nebariapp rayserve-nebari-rayserve-dashboard -o jsonpath='{.spec.service}'
+kubectl -n rayserve get nebariapp rayserve-nebari-rayserve-pack-dashboard -o jsonpath='{.spec.service}'
 ```
 
-The stable services are `<release>-nebari-rayserve-head-svc` and
-`<release>-nebari-rayserve-serve-svc`. A `nameOverride`, `fullnameOverride`, or an explicit
+The stable services are `<release>-nebari-rayserve-pack-head-svc` and
+`<release>-nebari-rayserve-pack-serve-svc`. A `nameOverride`, `fullnameOverride`, or an explicit
 `nebariapp.service.name` can put these out of step.
 
 ## The serve NebariApp was never created
@@ -104,7 +104,7 @@ Users must restart their server afterwards.
 ## Serve application will not deploy
 
 ```bash
-kubectl -n rayserve get rayservice rayserve-nebari-rayserve -o jsonpath='{.status}' | jq
+kubectl -n rayserve get rayservice rayserve-nebari-rayserve-pack -o jsonpath='{.status}' | jq
 ```
 
 `DEPLOY_FAILED` is nearly always an import error — the module named in `import_path` is not
@@ -170,7 +170,7 @@ Raise `head.resources.limits.memory`.
 
 ```bash
 kubectl -n rayserve get all
-kubectl -n rayserve describe rayservice rayserve-nebari-rayserve
+kubectl -n rayserve describe rayservice rayserve-nebari-rayserve-pack
 kubectl -n rayserve get rayservice -o yaml
 kubectl -n rayserve logs $(kubectl -n rayserve get pod -l ray.io/node-type=head -o name) --tail=200
 kubectl -n rayserve get events --sort-by=.lastTimestamp | tail -30

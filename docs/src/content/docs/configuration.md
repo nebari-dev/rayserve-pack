@@ -11,7 +11,7 @@ Everything is owned by this chart except `kuberay-operator.*`, which passes thro
 | Value | Default | Purpose |
 |---|---|---|
 | `image.repository` | `rayproject/ray` | Used for both head and workers. |
-| `image.tag` | `2.43.0` | Ray version. Also written to the RayService's `rayVersion`. |
+| `image.tag` | `2.43.0` | Ray version. Written verbatim into the RayService's `rayVersion`, so tag custom images with the plain Ray version. |
 
 For production, build a custom image with your model code — see
 [Deploying models](/serve-applications/). Notebook environments must match this version;
@@ -34,8 +34,8 @@ see [Connecting from Jupyter](/jupyter/#versions-must-match).
 | Value | Default | Purpose |
 |---|---|---|
 | `worker.replicas` | `1` | Worker pods. |
-| `worker.minReplicas` | `1` | Autoscaler lower bound; defaults to `replicas`. |
-| `worker.maxReplicas` | `1` | Autoscaler upper bound; defaults to `replicas`. |
+| `worker.minReplicas` | `1` | Lower clamp on `replicas`. Pinned to `1` in `values.yaml` — it does not follow `replicas`. |
+| `worker.maxReplicas` | `1` | Upper clamp on `replicas`. Same caveat; leave it below `replicas` and you get `maxReplicas` workers. |
 | `worker.resources.requests` | `cpu: 1`, `memory: 2Gi` | — |
 | `worker.resources.limits` | `cpu: 2`, `memory: 4Gi` | — |
 | `worker.runtimeClassName` | unset | e.g. `nvidia`. |
@@ -49,6 +49,13 @@ Helm's deep merge keeps existing keys when overlaying with an empty map. Use `nu
 fall back to KubeRay's default. Full rationale in [Scaling and GPUs](/scaling/#probes).
 :::
 
+:::caution[Always set `replicas`, `minReplicas`, and `maxReplicas` together]
+The chart does not enable `enableInTreeAutoscaling`, so there is no Ray autoscaler and the
+group size is exactly `replicas` — clamped into `[minReplicas, maxReplicas]` by KubeRay.
+Since `values.yaml` pins both bounds to `1`, raising `replicas` alone changes nothing. See
+[Scaling and GPUs](/scaling/#adding-workers).
+:::
+
 ## `serve` and `serveApplications`
 
 | Value | Default | Purpose |
@@ -56,8 +63,9 @@ fall back to KubeRay's default. Full rationale in [Scaling and GPUs](/scaling/#p
 | `serve.proxyLocation` | `EveryNode` | `EveryNode`, `HeadOnly`, or `Disabled`. |
 | `serveApplications` | `[]` | Applications, serialized into `serveConfigV2`. |
 
-Each entry needs `name`, `route_prefix`, and an `import_path` resolvable inside the image.
-Anything else valid in
+Each entry needs a `name` and an `import_path` resolvable inside the image. `route_prefix`
+is optional — it defaults to `/`, which means you must set it explicitly once you have more
+than one application. Anything else valid in
 [Ray Serve's config schema](https://docs.ray.io/en/latest/serve/production-guide/config.html)
 is passed through. See [Deploying models](/serve-applications/).
 
@@ -129,7 +137,7 @@ name has to be updated too.
 ```yaml
 image:
   repository: your-registry/your-ray-image
-  tag: "2.43.0-custom"
+  tag: "2.43.0"
 
 head:
   resources:
@@ -139,7 +147,7 @@ head:
 worker:
   replicas: 2
   minReplicas: 2
-  maxReplicas: 8
+  maxReplicas: 2
   runtimeClassName: nvidia
   resources:
     requests: { cpu: "4", memory: "16Gi" }
@@ -172,6 +180,7 @@ nebariapp:
 ## Inspecting
 
 ```bash
+helm dependency update chart   # once — templating fails without the kuberay-operator subchart
 helm template rayserve chart --set nebariapp.enabled=true \
   --set nebariapp.dashboard.hostname=ray-dashboard.example.com | less
 

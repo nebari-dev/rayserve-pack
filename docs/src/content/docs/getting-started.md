@@ -27,13 +27,13 @@ see [Deploying on Nebari](/deployment/).
 
 | Object | Kind | Purpose |
 |---|---|---|
-| `rayserve-nebari-rayserve` | RayService | Ray cluster and Serve config |
-| `rayserve-nebari-rayserve-head-svc` | Service | `:8265` dashboard, `:10001` ray client, `:6379` GCS |
-| `rayserve-nebari-rayserve-serve-svc` | Service | `:8000` Serve HTTP |
+| `rayserve-nebari-rayserve-pack` | RayService | Ray cluster and Serve config |
+| `rayserve-nebari-rayserve-pack-head-svc` | Service | `:8265` dashboard, `:10001` ray client, `:6379` GCS |
+| `rayserve-nebari-rayserve-pack-serve-svc` | Service | `:8000` Serve HTTP |
 | `kuberay-operator` | Deployment | Reconciles the RayService |
 
 Names come from the fullname helper — `<release>-<chart>` — so a release named `rayserve`
-gives `rayserve-nebari-rayserve`. Long, but predictable, and the same helper feeds the
+gives `rayserve-nebari-rayserve-pack`. Long, but predictable, and the same helper feeds the
 `NebariApp` service references.
 
 :::note[The two Services are the chart's, not KubeRay's]
@@ -47,10 +47,10 @@ directly, so they work from the first second.
 
 ```bash
 # Ray dashboard
-kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 -n rayserve
 
 # Serve HTTP endpoint
-kubectl port-forward svc/rayserve-nebari-rayserve-serve-svc 8000:8000 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-serve-svc 8000:8000 -n rayserve
 ```
 
 The dashboard at `http://localhost:8265` shows the cluster, its nodes, and the Serve

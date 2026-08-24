@@ -28,12 +28,19 @@ make down           # delete the cluster
 Override with `make up HOSTNAME=... DASH_HOSTNAME=...`, or `CLUSTER_NAME=` for the kind
 cluster (default `rayserve-dev`).
 
+:::note[`make up` sets `nebariapp.serve.enabled=true`]
+Deliberately unlike the production posture, which keeps the serve endpoint off the gateway.
+The dev stack turns it on so both `NebariApp` resources actually render and get exercised —
+with the chart default of `false`, the serve one is silently skipped. See
+[Deploying on Nebari](/deployment/).
+:::
+
 `make up-standalone` skips the platform entirely and reuses an existing cluster if one is
 there. Reach it by port-forward:
 
 ```bash
-kubectl port-forward svc/rayserve-nebari-rayserve-serve-svc 8000:8000
-kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-serve-svc 8000:8000
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265
 ```
 
 ## What `make up` does
@@ -44,7 +51,8 @@ kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265
    scripts (Envoy Gateway, cert-manager, Keycloak).
 3. Installs the operator and labels the `default` namespace `nebari.dev/managed=true`.
 4. `helm dependency update` then `helm upgrade --install` with both `NebariApp`s enabled.
-5. Waits for `nebariapp/rayserve-nebari-rayserve` to reach `Ready`.
+5. Waits for `nebariapp/rayserve-nebari-rayserve-pack` and
+   `nebariapp/rayserve-nebari-rayserve-pack-dashboard` to reach `Ready`.
 6. Runs the operator's `update-hosts.sh` to add both hostnames to `/etc/hosts` — **this uses
    sudo**.
 
@@ -61,7 +69,9 @@ The cluster and platform stay in place, so the loop is a Helm upgrade rather tha
 rebuild. For a faster check with no cluster at all:
 
 ```bash
+helm dependency update chart   # once — templating fails without the kuberay-operator subchart
 helm template rayserve chart --set nebariapp.enabled=true \
+  --set nebariapp.serve.enabled=true \
   --set nebariapp.hostname=rayserve.nebari.local \
   --set nebariapp.dashboard.hostname=ray-dashboard.nebari.local | less
 ```

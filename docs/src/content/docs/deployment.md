@@ -42,7 +42,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/nebari-dev/nebari-rayserve-pack.git
+    repoURL: https://github.com/nebari-dev/rayserve-pack.git
     targetRevision: main
     path: chart
     helm:
@@ -102,8 +102,10 @@ permanent drift, reports `OutOfSync` forever, and with `selfHeal: true` fights t
 controller in a loop.
 
 The two Services this chart renders also carry
-`argocd.argoproj.io/compare-options: IgnoreExtraneous`, as does the RayService, which
-handles the resources KubeRay creates alongside them.
+`argocd.argoproj.io/compare-options: IgnoreExtraneous`, as does the RayService. That option
+tells Argo CD to skip a resource during comparison when it is live in the cluster but not in
+the desired state — so once KubeRay adopts and rewrites these objects they neither show as
+drift nor get pruned.
 
 :::caution[`/spec/rayClusterConfig` is a very broad ignore]
 Combined with `RespectIgnoreDifferences=true` and server-side apply, it tells Argo CD to
@@ -157,8 +159,11 @@ nebariapp:
   gateway: public   # or: internal
 ```
 
-Applies to both resources. `internal` is worth considering for the dashboard even when the
-serve endpoint is exposed — it shows cluster internals, logs, and job state.
+One value, applied to both resources — there is no per-endpoint override, so exposing the
+serve endpoint publicly necessarily exposes the dashboard on the same gateway. Since the
+dashboard shows cluster internals, logs, and job state, that pairing is usually the wrong
+trade: prefer `internal` with the serve endpoint kept off the gateway entirely
+(`serve.enabled: false`). Splitting them across two gateways needs two releases.
 
 ## Landing-page tile
 
@@ -187,7 +192,7 @@ is a single-page app that returns 200 even when the backend is unhealthy.
 
 ```bash
 kubectl -n rayserve get nebariapp
-kubectl -n rayserve describe nebariapp rayserve-nebari-rayserve-dashboard
+kubectl -n rayserve describe nebariapp rayserve-nebari-rayserve-pack-dashboard
 kubectl -n rayserve get httproute,securitypolicy
 kubectl get namespace rayserve -o jsonpath='{.metadata.labels}'
 ```

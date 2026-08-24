@@ -21,8 +21,9 @@ Ray 2.43.0, KubeRay operator 1.3.0.
                                     │          :10001 ray client
                                     └── worker pod(s)
 
-   head-svc   :8265 :10001 :6379  ◄── notebooks (ray:// and HTTP)
-   serve-svc  :8000               ◄── NebariApp ◄── browsers
+   head-svc   :8265 :10001 :6379  ◄── notebooks (ray://), dashboard
+   serve-svc  :8000               ◄── notebooks (HTTP)
+                                  ◄── NebariApp ◄── browsers
 ```
 
 ## Two ways in

@@ -78,8 +78,9 @@ selector:
 ```
 
 They exist from the moment the chart installs, regardless of Serve state. Both carry
-`argocd.argoproj.io/compare-options: IgnoreExtraneous` so Argo CD tolerates the Services
-KubeRay creates alongside them.
+`argocd.argoproj.io/compare-options: IgnoreExtraneous`, which tells Argo CD to skip them
+during comparison when they are live in the cluster but absent from the desired state — so
+KubeRay adopting and rewriting them does not surface as drift or trigger a prune.
 
 Note that `serve-svc` targets **only the head pod**, even under `proxyLocation: EveryNode`.
 The per-node proxies serve direct-to-pod traffic; the Service does not load-balance across
