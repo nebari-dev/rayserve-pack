@@ -171,6 +171,11 @@ jobs:
       # ============================================================
       - name: Upgrade with auth enabled
         run: |
+          # Auth is the only intended delta. The sizing overrides from the
+          # install step must be repeated: dropping them doubles the head's
+          # requests and adds a worker, which rolls the Ray cluster into pods
+          # a 2-CPU runner cannot schedule, and --wait then times out on
+          # "generation is 2, but latest observed generation is 1".
           helm upgrade rayserve chart/ \
             --set kuberay-operator.enabled=false \
             --set nebariapp.enabled=true \
@@ -179,6 +184,11 @@ jobs:
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=ray-dashboard.nebari.local \
             --set nebariapp.auth.enabled=true \
+            --set head.resources.requests.cpu=500m \
+            --set head.resources.requests.memory=512Mi \
+            --set head.resources.limits.cpu=1 \
+            --set head.resources.limits.memory=1Gi \
+            --set worker.replicas=0 \
             --wait --timeout 5m
 
       - name: Verify SecurityPolicies created
