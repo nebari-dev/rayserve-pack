@@ -1,6 +1,6 @@
 # Nebari Ray Serve Software Pack
 
-A [Nebari Software Pack](https://github.com/nebari-dev/nebari-software-pack-template) that deploys [Ray Serve](https://docs.ray.io/en/latest/serve/index.html) on Kubernetes using the [RayService CRD](https://docs.ray.io/en/latest/serve/production-guide/kubernetes.html), with optional routing, TLS, and OIDC authentication via the [nebari-operator](https://github.com/nebari-dev/nebari-operator).
+A [Nebari Software Pack](https://github.com/nebari-dev/software-pack-template) that deploys [Ray Serve](https://docs.ray.io/en/latest/serve/index.html) on Kubernetes using the [RayService CRD](https://docs.ray.io/en/latest/serve/production-guide/kubernetes.html), with optional routing, TLS, and OIDC authentication via the [nebari-operator](https://github.com/nebari-dev/nebari-operator).
 
 ## Overview
 
@@ -40,10 +40,10 @@ Access via port-forward:
 
 ```bash
 # Ray Dashboard
-kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 -n rayserve
 
 # Ray Serve endpoint
-kubectl port-forward svc/rayserve-nebari-rayserve-serve-svc 8000:8000 -n rayserve
+kubectl port-forward svc/rayserve-nebari-rayserve-pack-serve-svc 8000:8000 -n rayserve
 ```
 
 ### On a Nebari cluster (via ArgoCD)
@@ -63,7 +63,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/nebari-dev/nebari-rayserve-pack.git
+    repoURL: https://github.com/nebari-dev/rayserve-pack.git
     targetRevision: main
     path: chart
     helm:
@@ -127,7 +127,7 @@ spec:
 
 ## Connecting from Jupyter
 
-From a notebook running in the same cluster (e.g., via the [nebari-data-science-pack](https://github.com/nebari-dev/nebari-data-science-pack)):
+From a notebook running in the same cluster (e.g., via the [nebari-data-science-pack](https://github.com/nebari-dev/data-science-pack)):
 
 ```python
 import ray
@@ -135,7 +135,7 @@ from ray import serve
 import requests
 
 # Connect to the Ray cluster
-ray.init("ray://rayserve-nebari-rayserve-head-svc.rayserve.svc.cluster.local:10001")
+ray.init("ray://rayserve-nebari-rayserve-pack-head-svc.rayserve.svc.cluster.local:10001")
 
 # Deploy a model
 @serve.deployment
@@ -146,14 +146,14 @@ class Hello:
 serve.run(Hello.bind(), name="hello", route_prefix="/hello")
 
 # Run inference
-resp = requests.get("http://rayserve-nebari-rayserve-serve-svc.rayserve.svc.cluster.local:8000/hello")
+resp = requests.get("http://rayserve-nebari-rayserve-pack-serve-svc.rayserve.svc.cluster.local:8000/hello")
 print(resp.text)
 # Hello from Ray Serve!
 ```
 
 No manual Serve initialization is needed — the RayService CRD starts the Serve proxy with `host: 0.0.0.0` automatically.
 
-**Note:** The Ray and Python versions in your Jupyter environment must match the Ray cluster. This chart deploys Ray 2.43.0 with Python 3.9 by default. If using [Nebi](https://github.com/nebari-dev/nebari-nebi-pack) for environment management, create a workspace with:
+**Note:** The Ray and Python versions in your Jupyter environment must match the Ray cluster. This chart deploys Ray 2.43.0 with Python 3.9 by default. If using [Nebi](https://github.com/nebari-dev/nebi-pack) for environment management, create a workspace with:
 
 ```toml
 [workspace]
@@ -174,7 +174,7 @@ For production, bake your model code into a custom Docker image and declare appl
 ```yaml
 image:
   repository: your-registry/your-ray-image
-  tag: "2.43.0-custom"
+  tag: "2.43.0"
 
 serveApplications:
   - name: my-model
@@ -196,7 +196,7 @@ Key values in `chart/values.yaml`:
 | Value | Default | Description |
 |-------|---------|-------------|
 | `nebariapp.enabled` | `false` | Create NebariApp resources for routing/TLS/auth |
-| `nebariapp.serve.enabled` | `true` | Expose the serve endpoint externally (set `false` to keep internal-only) |
+| `nebariapp.serve.enabled` | `false` | Expose the serve endpoint externally (set `false` to keep internal-only) |
 | `nebariapp.hostname` | - | Hostname for the Ray Serve endpoint (required when serve.enabled) |
 | `nebariapp.dashboard.enabled` | `true` | Create a separate NebariApp for the Ray Dashboard |
 | `nebariapp.dashboard.hostname` | - | Hostname for the Ray Dashboard (required when dashboard enabled) |
@@ -258,7 +258,7 @@ orgCABundle:
 
 > **⚠️ ArgoCD footgun — the CA bundle silently won't apply.** The ArgoCD `Application` shown under [On a Nebari cluster (via ArgoCD)](#on-a-nebari-cluster-via-argocd) sets `RespectIgnoreDifferences=true` together with an `ignoreDifferences` rule on `/spec/rayClusterConfig`. With server-side apply, that combination tells ArgoCD to **stop managing every field under `rayClusterConfig`** — which is exactly where this chart injects the initContainer, volumes, volumeMounts, and CA env vars for the head and worker pods. The result is a silent failure: ArgoCD reports a healthy, fully-synced `Application`, but the running RayService never gets the CA bundle, and TLS calls keep failing with `CERTIFICATE_VERIFY_FAILED`.
 >
-> If you enable `orgCABundle` on a cluster managed by ArgoCD with the example sync policy, you must **narrow the ignore rule** so the CA fields are still reconciled. The broad `/spec/rayClusterConfig` ignore exists only to suppress the autoscaler/runtime mutations KubeRay makes; replace it with targeted pointers (or drop it and ignore only the specific subpaths KubeRay rewrites). After changing it, confirm the head and worker pods actually carry `SSL_CERT_FILE` (`kubectl exec ... -- printenv SSL_CERT_FILE`) rather than trusting the ArgoCD sync status. See [#17](https://github.com/nebari-dev/nebari-rayserve-pack/issues/17) for details.
+> If you enable `orgCABundle` on a cluster managed by ArgoCD with the example sync policy, you must **narrow the ignore rule** so the CA fields are still reconciled. The broad `/spec/rayClusterConfig` ignore exists only to suppress the autoscaler/runtime mutations KubeRay makes; replace it with targeted pointers (or drop it and ignore only the specific subpaths KubeRay rewrites). After changing it, confirm the head and worker pods actually carry `SSL_CERT_FILE` (`kubectl exec ... -- printenv SSL_CERT_FILE`) rather than trusting the ArgoCD sync status. See [#17](https://github.com/nebari-dev/rayserve-pack/issues/17) for details.
 
 **Coverage caveat — httpx default `verify=True`:** httpx hardcodes its SSL context to `cafile=certifi.where()`, which means it **ignores** `SSL_CERT_FILE`. Application code making httpx calls that need to traverse a TLS-inspecting proxy must construct an explicit context:
 

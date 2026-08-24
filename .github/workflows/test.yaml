@@ -78,7 +78,7 @@ jobs:
 
       - name: Health check Ray Dashboard
         run: |
-          kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 &
+          kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 &
           sleep 5
           curl -sf http://localhost:8265/api/version
           kill %1

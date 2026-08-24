@@ -144,10 +144,10 @@ jobs:
           kubectl wait --for=condition=ready pod -l ray.io/node-type=head --timeout=300s
 
       - name: Verify NebariApp (serve)
-        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve --timeout=300s
+        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-pack --timeout=300s
 
       - name: Verify NebariApp (dashboard)
-        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-dashboard --timeout=300s
+        run: kubectl wait --for=condition=Ready nebariapp/rayserve-nebari-rayserve-pack-dashboard --timeout=300s
 
       - name: Verify HTTPRoutes created
         run: |
@@ -161,7 +161,7 @@ jobs:
 
       - name: Health check Ray Dashboard via port-forward
         run: |
-          kubectl port-forward svc/rayserve-nebari-rayserve-head-svc 8265:8265 &
+          kubectl port-forward svc/rayserve-nebari-rayserve-pack-head-svc 8265:8265 &
           sleep 5
           curl -sf http://localhost:8265/api/version
           kill %1
