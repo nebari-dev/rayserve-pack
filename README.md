@@ -219,6 +219,10 @@ Key values in `chart/values.yaml`:
 | `worker.resources.requests.cpu` | `1` | Worker CPU request |
 | `worker.resources.requests.memory` | `2Gi` | Worker memory request |
 | `worker.runtimeClassName` | - | Runtime class for worker pods (e.g., `nvidia` for GPU) |
+| `autoscaling.enabled` | `false` | Enable Ray in-tree autoscaling of worker pods |
+| `autoscaling.idleTimeoutSeconds` | `60` | Seconds an idle worker is kept before scale-down |
+| `autoscaling.upscalingMode` | `Default` | `Default`, `Conservative`, or `Aggressive` |
+| `autoscaling.resources` | `{}` | Optional resources for the autoscaler sidecar container |
 
 ### Serve Applications
 

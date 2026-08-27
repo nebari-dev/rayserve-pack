@@ -223,6 +223,52 @@ worker:
     failureThreshold: 120
 
 # =============================================================================
+# Ray In-Tree Autoscaling
+# =============================================================================
+# Enable Ray's in-tree autoscaler to dynamically scale worker pods based on
+# task demand. When `autoscaling.enabled` is true, the chart:
+#   - Sets `enableInTreeAutoscaling: true` on the RayCluster spec, causing
+#     KubeRay to attach an autoscaler sidecar container to the head pod.
+#   - Uses `worker.minReplicas` and `worker.maxReplicas` as the scaling range
+#     (both fields are already exposed above; without autoscaling enabled
+#     they are ignored by KubeRay).
+#
+# Without autoscaling.enabled the chart is byte-identical to the pre-existing
+# behaviour: worker.replicas is the deployed count, min/max are inert.
+#
+# See the KubeRay autoscaling guide for background:
+# https://docs.ray.io/en/latest/cluster/kubernetes/user-guides/configuring-autoscaling.html
+#
+# Ray's docs explicitly note that autoscaling "adds node launch overheads
+# and can be tricky to configure" — starting with a fixed replica count
+# (autoscaling.enabled: false) is recommended for newcomers.
+autoscaling:
+  enabled: false
+
+  # Time in seconds an idle worker pod is kept alive before being scaled
+  # down. Lower values reclaim resources faster but can create pod churn if
+  # tasks arrive in bursts.
+  idleTimeoutSeconds: 60
+
+  # upscalingMode:
+  #   - `Default`      — standard responsiveness
+  #   - `Conservative` — pending requests scale up in batches on a delay
+  #   - `Aggressive`   — immediately upscale to satisfy demand
+  upscalingMode: Default
+
+  # Optional overrides for the autoscaler sidecar container's resources.
+  # KubeRay's own defaults apply when unset ({}); typical production
+  # override:
+  #   resources:
+  #     limits:
+  #       cpu: "500m"
+  #       memory: "512Mi"
+  #     requests:
+  #       cpu: "500m"
+  #       memory: "512Mi"
+  resources: {}
+
+# =============================================================================
 # Overrides
 # =============================================================================
 nameOverride: ""
