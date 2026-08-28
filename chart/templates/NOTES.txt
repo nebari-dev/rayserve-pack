@@ -3,27 +3,12 @@
 The RayService controller manages the Ray cluster and Serve proxy.
 Serve is pre-initialized with host 0.0.0.0 on port 8000.
 
-{{- if .Values.nebariapp.enabled }}
-
-NebariApp is ENABLED. The nebari-operator will configure:
-  {{- if ne (toString (dig "serve" "enabled" true .Values.nebariapp)) "false" }}
-  - HTTPRoute for Ray Serve: {{ .Values.nebariapp.hostname }}
-  {{- end }}
-  {{- if .Values.nebariapp.dashboard.enabled }}
-  - HTTPRoute for Ray Dashboard: {{ .Values.nebariapp.dashboard.hostname }}
-  {{- end }}
-  {{- if .Values.nebariapp.auth.enabled }}
-  - OIDC authentication via {{ .Values.nebariapp.auth.provider }}
-  {{- end }}
-
-{{- else }}
 
 To access locally:
 
   kubectl port-forward svc/{{ include "nebari-rayserve.serve-service-name" . }} 8000:8000 -n {{ .Release.Namespace }}
   kubectl port-forward svc/{{ include "nebari-rayserve.head-service-name" . }} 8265:8265 -n {{ .Release.Namespace }}
 
-{{- end }}
 
 === Deploying Models ===
 
