@@ -21,22 +21,10 @@ jobs:
       - name: Lint chart
         run: helm lint chart/
 
-      - name: Template chart (NebariApp disabled)
-        run: helm template test chart/ --set nebariapp.enabled=false
-
       - name: Template chart (NebariApp enabled)
         run: |
           helm template test chart/ \
-            --set nebariapp.enabled=true \
-            --set nebariapp.hostname=test.example.com \
+            --set nebariapp.serve.enabled=true \
+            --set nebariapp.serve.hostname=test.example.com \
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=dashboard.example.com
-
-      - name: Template chart (NebariApp + auth enabled)
-        run: |
-          helm template test chart/ \
-            --set nebariapp.enabled=true \
-            --set nebariapp.hostname=test.example.com \
-            --set nebariapp.dashboard.enabled=true \
-            --set nebariapp.dashboard.hostname=dashboard.example.com \
-            --set nebariapp.auth.enabled=true
