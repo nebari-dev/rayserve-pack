@@ -119,7 +119,7 @@ jobs:
           helm install rayserve chart/ \
             --set kuberay-operator.enabled=false \
             --set nebariapp.enabled=true \
-            --set nebariapp.hostname=rayserve.nebari.local \
+            --set nebariapp.serve.hostname=rayserve.nebari.local \
             --set nebariapp.serve.enabled=true \
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=ray-dashboard.nebari.local \

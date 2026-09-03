@@ -33,7 +33,8 @@ jobs:
         run: |
           helm install rayserve chart/ \
             --set kuberay-operator.enabled=false \
-            --set nebariapp.enabled=false \
+            --set nebariapp.serve.enabled=false \
+            --set nebariapp.dashboard.enabled=false \
             --set head.resources.requests.cpu=500m \
             --set head.resources.requests.memory=512Mi \
             --set head.resources.limits.cpu=1 \

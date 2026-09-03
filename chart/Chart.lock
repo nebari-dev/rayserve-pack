@@ -1,0 +1,9 @@
+dependencies:
+- name: nebari-app
+  repository: oci://quay.io/reiemp/charts
+  version: 0.1.2
+- name: kuberay-operator
+  repository: https://ray-project.github.io/kuberay-helm/
+  version: 1.3.0
+digest: sha256:9e9345b359fb1be3ec07a39e1fbe3ce0b600309715741d318087170486ba8cde
+generated: "2026-08-28T17:43:29.042013605+02:00"
