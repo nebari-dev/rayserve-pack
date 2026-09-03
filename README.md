@@ -70,17 +70,13 @@ spec:
       releaseName: rayserve
       values: |
         nebariapp:
-          enabled: true
           serve:
             enabled: false  # Keep serve endpoint internal-only
           dashboard:
             enabled: true
             hostname: ray-dashboard.example.com
-          auth:
-            enabled: true
-            provider: keycloak
-            provisionClient: true
-            redirectURI: /oauth2/callback
+            auth:
+              enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: rayserve
@@ -195,14 +191,12 @@ Key values in `chart/values.yaml`:
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `nebariapp.enabled` | `false` | Create NebariApp resources for routing/TLS/auth |
 | `nebariapp.serve.enabled` | `false` | Expose the serve endpoint externally (set `false` to keep internal-only) |
-| `nebariapp.hostname` | - | Hostname for the Ray Serve endpoint (required when serve.enabled) |
-| `nebariapp.dashboard.enabled` | `true` | Create a separate NebariApp for the Ray Dashboard |
-| `nebariapp.dashboard.hostname` | - | Hostname for the Ray Dashboard (required when dashboard enabled) |
-| `nebariapp.auth.enabled` | `false` | Enable OIDC authentication via Keycloak |
-| `nebariapp.auth.redirectURI` | `/oauth2/callback` | OAuth callback path (Envoy Gateway rejects `/`) |
-| `nebariapp.gateway` | `public` | Gateway to use (`public` or `internal`) |
+| `nebariapp.serve.hostname` | - | Hostname for the Ray Serve endpoint (required when serve.enabled) |
+| `nebariapp.serve.auth.enabled` | `false` | Enable OIDC authentication for the Ray Serve endpoint via Keycloak |
+| `nebariapp.dashboard.enabled` | `false` | Create a separate NebariApp for the Ray Dashboard |
+| `nebariapp.dashboard.hostname` | - | Hostname for the Ray Dashboard (required when dashboard.enabled) |
+| `nebariapp.dashboard.auth.enabled` | `false` | Enable OIDC authentication for the Ray Dashboard endpoint via Keycloak |
 
 ### Ray Cluster
 
