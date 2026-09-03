@@ -9,7 +9,6 @@ nebariapp:
     service:
       name: '{{ include "nebari-rayserve.serve-service-name" . | toJson }}'
       port: 8000
-    gateway: public
     routing:
       routes:
         - pathPrefix: /
@@ -32,7 +31,6 @@ nebariapp:
         path: /api/component_activities
         intervalSeconds: 30
         timeoutSeconds: 5
-    gateway: public
     routing:
       routes:
         - pathPrefix: /
