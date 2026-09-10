@@ -1,7 +1,9 @@
 # =============================================================================
 # Nebari Integration
 # =============================================================================
-# Creates NebariApp CRs that configure routing, TLS, and auth via nebari-operator.
+# NebariApp CRs (https://github.com/nebari-dev/nebari-operator).
+# Rendered through the official nebari-app.nebariApp template 
+# (https://github.com/nebari-dev/nebari-operator/tree/main/charts/nebari-app) with templating enabled.
 nebariapp:
   serve:
     enabled: false
