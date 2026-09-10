@@ -41,14 +41,138 @@ worker:
 replicas into the `[minReplicas, maxReplicas]` range.
 :::
 
-There is no autoscaler behind these bounds. The chart does not set
-`enableInTreeAutoscaling`, so KubeRay runs no Ray autoscaler sidecar and the group size is
-exactly `replicas`. Growing the pool means changing `replicas` and running `helm upgrade`;
-`minReplicas` and `maxReplicas` are clamps, not a range something moves within.
+By default there is no autoscaler behind these bounds: the group size is exactly `replicas`,
+and growing the pool means changing `replicas` and running `helm upgrade`. `minReplicas` and
+`maxReplicas` only become a range something moves within under
+[Ray autoscaling](#ray-autoscaling).
+
+:::caution[Changing the worker count does not reach a running cluster]
+A `helm upgrade` that changes only `replicas`, `minReplicas`, or `maxReplicas` updates the
+RayService and stops there. The RayService controller leaves those three fields out of the
+spec hash it uses to detect drift, so the running RayCluster keeps its old numbers — no event,
+no rollout, no error. The change lands only when some other `rayClusterConfig` field changes in
+the same upgrade, and then as a full cluster roll. To add workers to a running cluster, patch
+the RayCluster directly and put the same numbers in your values file so the next rollout
+carries them:
+
+```bash
+kubectl -n rayserve patch raycluster <name> --type json -p '[
+  {"op":"replace","path":"/spec/workerGroupSpecs/0/replicas","value":6},
+  {"op":"replace","path":"/spec/workerGroupSpecs/0/minReplicas","value":6},
+  {"op":"replace","path":"/spec/workerGroupSpecs/0/maxReplicas","value":6}]'
+```
+
+KubeRay adds the pods in place. See
+[why a range change does not reach the cluster](#why-a-range-change-does-not-reach-the-cluster);
+a chart-side fix is tracked in [#41](https://github.com/nebari-dev/rayserve-pack/issues/41).
+:::
 
 Whether the new pods actually land is a separate question. On a cluster with a node
 autoscaler, asking for more than current nodes can hold triggers node scale-up; without one,
 the extra pods stay `Pending`.
+
+## Ray autoscaling
+
+```yaml
+autoscaling:
+  enabled: true
+
+worker:
+  minReplicas: 1
+  maxReplicas: 6
+  resources:
+    requests: { cpu: "4", memory: "16Gi" }
+    limits:   { cpu: "4", memory: "16Gi" }
+
+serveApplications:
+  - name: my-model
+    import_path: myapp.model:app
+    deployments:
+      - name: MyModel
+        ray_actor_options: { num_cpus: 4 }
+        autoscaling_config:
+          min_replicas: 1
+          max_replicas: 6
+          target_ongoing_requests: 2
+```
+
+Three layers, each reacting to the one above it:
+
+1. **Serve deployment autoscaling** (`autoscaling_config`) adds model replicas as request load
+   rises. Each replica needs the resources declared in `ray_actor_options`.
+2. **The Ray autoscaler**, which `autoscaling.enabled` turns on, adds worker pods when those
+   replicas have nowhere to run, within `[worker.minReplicas, worker.maxReplicas]`, and removes
+   pods that have been idle for `autoscaling.idleTimeoutSeconds`.
+3. **Your node autoscaler** adds nodes when the pods cannot be scheduled.
+
+The Ray autoscaler reacts to any unschedulable demand, so on a cluster that notebooks connect
+to over Ray client, users' tasks and actors are the first layer as much as Serve is. For a
+Serve-only cluster, a fixed `num_replicas` never generates demand and the autoscaler has
+nothing to do; and without the second layer, `autoscaling_config` can only scale within the
+resources the cluster already has.
+
+:::caution[Raise `maxReplicas`]
+Both bounds default to `1`. `autoscaling.enabled: true` alone leaves the group pinned at one
+worker and only adds the autoscaler sidecar to the head pod — `500m` CPU / `512Mi` memory,
+requests and limits, unless `autoscaling.resources` overrides it.
+:::
+
+### Tune Serve, set the cluster range once
+
+The two layers differ in how a change reaches a running service:
+
+- **Serve config** — `serveApplications`, including `autoscaling_config` — is applied in
+  place. The RayService controller resubmits it to the live cluster and replicas adjust in
+  seconds.
+- **Cluster config** — everything under `rayClusterConfig`, which includes `autoscaling.*` —
+  is replaced, not edited. Any change rolls a new RayCluster: a second head and worker set
+  start, Serve comes up on them, traffic switches, the old cluster is deleted. Zero downtime,
+  but a full model reload. The worker range is the exception: on its own it changes nothing
+  until something else rolls the cluster.
+
+So treat `worker.minReplicas` / `worker.maxReplicas` as a capacity budget — the most workers
+you will pay for, the fewest you want warm — set at install and rarely revisited. Put the
+behaviour you expect to tune in `autoscaling_config`: `min_replicas` / `max_replicas`,
+`target_ongoing_requests`, `upscale_delay_s` / `downscale_delay_s`.
+
+If you need a new ceiling on a live service, patch the RayCluster directly. The controller
+leaves the range fields to the autoscaler and will not revert it; put the same value in your
+values file so the next rollout carries it:
+
+```bash
+kubectl -n rayserve patch raycluster <name> --type json \
+  -p '[{"op":"replace","path":"/spec/workerGroupSpecs/0/maxReplicas","value":8}]'
+```
+
+### Why a range change does not reach the cluster
+
+The RayService controller excludes `replicas`, `minReplicas`, and `maxReplicas` from the spec
+hash it uses to detect drift, because the autoscaler writes `replicas` itself. So a
+`helm upgrade` changing only those fields — the autoscaling range, or the static worker
+count — never reaches the running cluster. Upstream considers this intended
+([kuberay #2331](https://github.com/ray-project/kuberay/issues/2331)); a fix that propagated
+the range in place was declined
+([kuberay #2333](https://github.com/ray-project/kuberay/pull/2333)), with the guidance being to
+edit the RayCluster directly, as above. A chart hook that applies the values to the live
+RayCluster automatically is proposed in
+[#41](https://github.com/nebari-dev/rayserve-pack/issues/41).
+
+### Idle timeout and upscaling mode
+
+`idleTimeoutSeconds: 60` is Ray's general-purpose default. A new worker pays an image pull and
+a model load, so for inference a longer hold — 300 to 600 seconds — usually beats reclaiming a
+pod that will be wanted again two minutes later.
+
+`upscalingMode: Default` is right for Serve. `Conservative` caps pending worker pods at the
+number already connected, which only helps when node provisioning is slow and a burst of
+`Pending` pods causes trouble. `Aggressive` is an alias for `Default`.
+
+### With Argo CD
+
+`enableInTreeAutoscaling` renders under `spec.rayClusterConfig` — the path the documented
+Application ignores under `RespectIgnoreDifferences=true`. Enabling autoscaling on an
+already-synced cluster is silently not applied unless that ignore rule is narrowed. Same issue
+as [`orgCABundle`](/ca-bundle/).
 
 ## GPUs
 
@@ -206,12 +330,9 @@ head that starts OOM-killing takes the whole cluster with it, so it is worth hea
 
 ## What is not here
 
-- **Ray cluster autoscaling** — the chart does not set `enableInTreeAutoscaling`, so the
-  worker group never grows on its own.
 - **Per-deployment autoscaling** — Ray Serve's own `autoscaling_config` goes in a
-  `serveApplications` deployment entry, not in the chart's values. It scales replicas within
-  the resources the cluster already has, which is all it can do without the cluster
-  autoscaler above.
+  `serveApplications` deployment entry, not in chart values. [Ray autoscaling](#ray-autoscaling)
+  covers how it pairs with the cluster autoscaler.
 - **Multiple worker groups** — the chart renders one `workerGroupSpecs` entry. Heterogeneous
   pools (CPU plus GPU) need a chart change or a second release.
 - **Node autoscaling** — that is your cluster autoscaler's job.

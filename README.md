@@ -214,11 +214,15 @@ Key values in `chart/values.yaml`:
 | `head.resources.requests.memory` | `2Gi` | Head node memory request |
 | `head.runtimeClassName` | - | Runtime class for head pod (e.g., `nvidia` for GPU) |
 | `worker.replicas` | `1` | Number of worker nodes |
-| `worker.minReplicas` | `1` | Min workers (for autoscaling) |
-| `worker.maxReplicas` | `1` | Max workers (for autoscaling) |
+| `worker.minReplicas` | `1` | Lower bound on workers; the autoscaler's floor when `autoscaling.enabled` |
+| `worker.maxReplicas` | `1` | Upper bound on workers; the autoscaler's ceiling when `autoscaling.enabled`. Raise it or autoscaling does nothing |
 | `worker.resources.requests.cpu` | `1` | Worker CPU request |
 | `worker.resources.requests.memory` | `2Gi` | Worker memory request |
 | `worker.runtimeClassName` | - | Runtime class for worker pods (e.g., `nvidia` for GPU) |
+| `autoscaling.enabled` | `false` | Enable Ray in-tree autoscaling of worker pods |
+| `autoscaling.idleTimeoutSeconds` | `60` | Seconds an idle worker is kept before scale-down |
+| `autoscaling.upscalingMode` | `Default` | `Default` or `Conservative` (rate-limited); `Aggressive` is an alias for `Default` |
+| `autoscaling.resources` | `{}` | Autoscaler sidecar resources; KubeRay's default is `500m` / `512Mi` for both requests and limits |
 
 ### Serve Applications
 
