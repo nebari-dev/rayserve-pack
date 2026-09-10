@@ -18,7 +18,7 @@ Serve is pre-initialized with host 0.0.0.0 on port 8000.
 {{- if $component.nebariapp.enabled }}
 {{- $nebariapp := include "nebari-app.deepTplJson" (dict "value" (omit $component.nebariapp "enabled") "ctx" $tplCtx) | fromJson }}
 
-NebariApp  for {{ $name }} is ENABLED. The nebari-operator will configure:
+NebariApp for {{ $name }} is ENABLED. The nebari-operator will configure:
   - HTTPRoute: {{ $nebariapp.hostname }}
   {{- if (and $nebariapp.auth $nebariapp.auth.enabled) }}
   - OIDC authentication via {{ $nebariapp.auth.provider | default "keycloak" }}

@@ -5,7 +5,7 @@
 nebariapp:
   serve:
     enabled: false
-    hostname: '{{ fail "nebariapps.serve.hostname is required if nebariapps.serve.enabled is true" }}'
+    hostname: '{{ fail "nebariapp.serve.hostname is required if nebariapps.serve.enabled is true" }}'
     service:
       name: '{{ include "nebari-rayserve.serve-service-name" . | toJson }}'
       port: 8000
@@ -15,7 +15,7 @@ nebariapp:
           pathType: PathPrefix
   dashboard:
     enabled: false
-    hostname: '{{ fail "nebariapps.dashboard.hostname is required if nebariapps.dashboard.enabled is true" }}'
+    hostname: '{{ fail "nebariapp.dashboard.hostname is required if nebariapps.dashboard.enabled is true" }}'
     service:
       name: '{{ include "nebari-rayserve.head-service-name" . | toJson }}'
       port: 8265
