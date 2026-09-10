@@ -23,7 +23,7 @@ spec:
     enableInTreeAutoscaling: true
     autoscalerOptions:
       idleTimeoutSeconds: {{ .Values.autoscaling.idleTimeoutSeconds }}
-      upscalingMode: {{ .Values.autoscaling.upscalingMode }}
+      upscalingMode: {{ .Values.autoscaling.upscalingMode | quote }}
       {{- with .Values.autoscaling.resources }}
       resources:
         {{- toYaml . | nindent 8 }}

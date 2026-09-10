@@ -34,8 +34,8 @@ see [Connecting from Jupyter](/jupyter/#versions-must-match).
 | Value | Default | Purpose |
 |---|---|---|
 | `worker.replicas` | `1` | Worker pods. |
-| `worker.minReplicas` | `1` | Lower clamp on `replicas`. Pinned to `1` in `values.yaml` — it does not follow `replicas`. |
-| `worker.maxReplicas` | `1` | Upper clamp on `replicas`. Same caveat; leave it below `replicas` and you get `maxReplicas` workers. |
+| `worker.minReplicas` | `1` | Lower clamp on `replicas`; the autoscaler's floor under [`autoscaling`](#autoscaling). Pinned to `1` in `values.yaml` — it does not follow `replicas`. |
+| `worker.maxReplicas` | `1` | Upper clamp on `replicas`; the autoscaler's ceiling under [`autoscaling`](#autoscaling). Same caveat; leave it below `replicas` and you get `maxReplicas` workers. |
 | `worker.resources.requests` | `cpu: 1`, `memory: 2Gi` | — |
 | `worker.resources.limits` | `cpu: 2`, `memory: 4Gi` | — |
 | `worker.runtimeClassName` | unset | e.g. `nvidia`. |
@@ -50,10 +50,29 @@ fall back to KubeRay's default. Full rationale in [Scaling and GPUs](/scaling/#p
 :::
 
 :::caution[Always set `replicas`, `minReplicas`, and `maxReplicas` together]
-The chart does not enable `enableInTreeAutoscaling`, so there is no Ray autoscaler and the
-group size is exactly `replicas` — clamped into `[minReplicas, maxReplicas]` by KubeRay.
-Since `values.yaml` pins both bounds to `1`, raising `replicas` alone changes nothing. See
+With `autoscaling.enabled: false` (the default) there is no Ray autoscaler, and the group
+size is exactly `replicas` — clamped into `[minReplicas, maxReplicas]` by KubeRay. Since
+`values.yaml` pins both bounds to `1`, raising `replicas` alone changes nothing. See
 [Scaling and GPUs](/scaling/#adding-workers).
+
+With autoscaling on, `replicas` is only the starting size and the bounds are the range the
+autoscaler works within — still `1..1` by default, so raise `maxReplicas`.
+:::
+
+## `autoscaling`
+
+| Value | Default | Purpose |
+|---|---|---|
+| `autoscaling.enabled` | `false` | Emits `enableInTreeAutoscaling: true`, so KubeRay attaches a Ray autoscaler sidecar to the head pod. |
+| `autoscaling.idleTimeoutSeconds` | `60` | Seconds an idle worker is kept before scale-down. |
+| `autoscaling.upscalingMode` | `Default` | `Default` (not rate-limited), `Conservative` (pending pods capped at connected workers), or `Aggressive` (an alias for `Default`). |
+| `autoscaling.resources` | `{}` | Overrides the sidecar's resources. Unset, KubeRay hardcodes requests **and** limits of `500m` CPU / `512Mi` memory. |
+
+:::note[The range is a budget, not a knob]
+Raise `worker.maxReplicas` — both bounds default to `1`. Then leave the range alone: a
+values-only change to it does not reach a running cluster at all, and changing any other
+`autoscaling.*` value rolls a new RayCluster, whereas a Serve deployment's own
+`autoscaling_config` applies in place. See [Ray autoscaling](/scaling/#ray-autoscaling).
 :::
 
 ## `serve` and `serveApplications`
