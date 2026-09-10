@@ -1,20 +1,20 @@
-{{- if hasKey .Values.nebariapp.enabled -}}
+{{- if hasKey .Values.nebariapp "enabled" -}}
 {{- fail "nebariapp.enabled was removed in version 0.5.0. Set nebariapp.serve.enabled and nebariapp.dashboard.enabled instead." -}}
 {{- end -}}
 
-{{- if hasKey .Values.nebariapp.hostname -}}
+{{- if hasKey .Values.nebariapp "hostname" -}}
 {{- fail "nebariapp.hostname was removed in version 0.5.0. Set nebariapp.serve.hostname instead." -}}
 {{- end -}}
 
-{{- if hasKey .Values.nebariapp.service -}}
+{{- if hasKey .Values.nebariapp "service" -}}
 {{- fail "nebariapp.service was removed in version 0.5.0. Set nebariapp.serve.service.{name,port} and nebariapp.dashboard.service.{name,port} instead." -}}
 {{- end -}}
 
-{{- if hasKey .Values.nebariapp.auth -}}
+{{- if hasKey .Values.nebariapp "auth" -}}
 {{- fail "nebariapp.auth was removed in version 0.5.0. Set nebariapp.serve.auth and nebariapp.dashboard.auth instead." -}}
 {{- end -}}
 
-{{- if hasKey .Values.nebariapp.gateway -}}
+{{- if hasKey .Values.nebariapp "gateway" -}}
 {{- fail "nebariapp.gateway was removed in version 0.5.0. Set nebariapp.serve.gateway and nebariapp.dashboard.gateway instead." -}}
 {{- end -}}
 
