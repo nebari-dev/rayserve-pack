@@ -118,9 +118,8 @@ jobs:
         run: |
           helm install rayserve chart/ \
             --set kuberay-operator.enabled=false \
-            --set nebariapp.enabled=true \
-            --set nebariapp.hostname=rayserve.nebari.local \
             --set nebariapp.serve.enabled=true \
+            --set nebariapp.serve.hostname=rayserve.nebari.local \
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=ray-dashboard.nebari.local \
             --set head.resources.requests.cpu=500m \
@@ -178,12 +177,12 @@ jobs:
           # "generation is 2, but latest observed generation is 1".
           helm upgrade rayserve chart/ \
             --set kuberay-operator.enabled=false \
-            --set nebariapp.enabled=true \
-            --set nebariapp.hostname=rayserve.nebari.local \
             --set nebariapp.serve.enabled=true \
+            --set nebariapp.serve.hostname=rayserve.nebari.local \
+            --set nebariapp.serve.auth.enabled=true \
             --set nebariapp.dashboard.enabled=true \
             --set nebariapp.dashboard.hostname=ray-dashboard.nebari.local \
-            --set nebariapp.auth.enabled=true \
+            --set nebariapp.dashboard.auth.enabled=true \
             --set head.resources.requests.cpu=500m \
             --set head.resources.requests.memory=512Mi \
             --set head.resources.limits.cpu=1 \

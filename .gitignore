@@ -1,6 +1,5 @@
 # Helm
 chart/charts/
-chart/Chart.lock
 
 # Dev environment
 dev/.cache/
